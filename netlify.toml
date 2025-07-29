@@ -3,5 +3,8 @@
   functions = "netlify/functions"
   command = "echo 'Netlify build complete!'"
 
-[functions]
-  python_version = "3.9"
+  # NEW SECTION: Define build environment variables here
+  [build.environment]
+    # This sets the Python version for the build environment, including functions
+    # This is a common and robust way to specify the Python runtime version
+    PYTHON_VERSION = "3.9"
