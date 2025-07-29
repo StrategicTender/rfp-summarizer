@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Summarizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>RFP Summarizer</h1>
+        <p>Upload your RFP document (text or PDF) and get a quick summary.</p>
+
+        <input type="file" id="rfpFileInput" accept=".txt,.pdf">
+        <button id="summarizeButton" disabled>Summarize RFP</button>
+
+        <div id="loading" class="hidden">Summarizing...</div>
+        <div id="error" class="error hidden"></div>
+        <div id="summaryOutput" class="summary hidden">
+            <h2>Summary:</h2>
+            <p id="summaryText"></p>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

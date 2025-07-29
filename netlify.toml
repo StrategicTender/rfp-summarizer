@@ -1,0 +1,8 @@
+[build]
+  publish = "public" # Directory where your static frontend files are located
+  functions = "netlify/functions" # Directory where your Netlify Functions are located
+  command = "echo 'Netlify build complete!'" # A simple command, as our frontend is just static files
+
+[functions]
+  python_version = "3.9" # Specify the Python version for your functions
+  node_bundler = "esbuild" # Recommended for faster Node.js function builds (even if using Python)
