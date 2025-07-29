@@ -1,7 +1,8 @@
 [build]
   publish = "public"
-  functions = "netlify/functions"
-  command = "echo 'Netlify build complete!'"
+    functions = "netlify/functions"
+      command = "echo 'Netlify build complete!'"
 
-  [build.environment]
-    PYTHON_VERSION = "3.9"
+      [build.environment]
+        PYTHON_VERSION = "3.9"
+        
