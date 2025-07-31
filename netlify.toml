@@ -1,6 +1,0 @@
-[build]
-  publish = "public"
-  functions = "netlify/functions"
-
-[functions]
-  python_version = "3.9"
