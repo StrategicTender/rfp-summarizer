@@ -3,21 +3,49 @@ const axios = require('axios');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not 
-Allowed' }) };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
   try {
     const { rfpContent } = JSON.parse(event.body);
 
-    if (!rfpContent || typeof rfpContent !== 'string' || 
-rfpContent.trim().length < 50) {
+    if (!rfpContent || typeof rfpContent !== 'string' || rfpContent.trim().length < 50) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Please provide a valid RFP with 
-sufficient content (at least 50 characters)' })
+        body: JSON.stringify({ error: 'Please provide a valid RFP with sufficient content (at least 50 
+characters)' })
       };
     }
 
-    const encodedKey = 
-`ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAic3RyYXRlZ2ljLXRlbmRlci1yZnAiLAogICJwcml2YXRlX2tleV9pZCI6ICJmOTdkMjgyYzE1NGI1MTEzNDMyNDFlNGY4Y2UyNDNhMWVkNzdhMDRlIiwKICAicHJpdmF0ZV9rZXkiOiAiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdkFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLWXdnZ1NpQWdFQUFvSUJBUUROTjk1ZkFTQmVMeXFqXG42c29GaCtTMlB2R0pCcXRFUUdHS3hvWHFlank3bnBTSnR3THBEK3pucVRiWktMU2hsN2NJeVRVZGtBR1FPWThKXG5aOEQwankrT09WanlBR3lUaGhQS1U3TjV5RlR2Qjl2ZmQrVHNSYUdNSFVkeVhsanE1TnhocGdvSHFRWXU1WC9tXG5MZURtLzlId0w2QTg3N253MGxXL3FzdU5QZm1EMmthR3FmTlhNMmVmUm9IL0dVOURCVEdQNUh6ai9XUmNHSzI5XG5lSlBxTUw0SXgvem5xbUJhQjBHd2liSUlSMEtvTW9Ld0l6U0p3TEd6aEkvS0t3cU1RWVNRWGwxVkNMUjNSb3ArXG5FVUo3SmdiSFI3Q211VUkxbmYxMFI4bXRLTVlVWWxHd0xNTWlNZk0ra0JTOGIydHpyTlNSdWpqVGI5aG9RRkxzXG5IQkM0eEVaUEFnTUJBQUVDZ2dFQVpLanN5RWp6S1grVk9NWG54Z0s4S3JDQkpTZENScjRWbWs1NlRXTWIreU56XG4xSUVTU21Oblh0SmZkdkZDZUtqRVBPa0V4clZtTHVvc3dQNUZaUy8rc1pKcmtIaW95VXZRMVVOdEcyVXFVL3pVXG4ycTRpZWNwRnpVWm5UeS84Q1d1c3RiRU41bWdBQW16TDZZbkRjVXMySE13Zm13UXpmbTZOWlBCUDI3MzBiN2wyXG5HSU94MVJMZWZ5QnZqL1N0Y2c4SXV2Sll0N09ZK3VHeHQ1TmV3MFcrc2hnWU5jaE1vMlI2a2ZlTkl6T20wb2ZNXG4zN3U4bnJMV05mZXBPNFNFaGVOdVoxSUFYUFQwSys2dWkrQkpESU5vc1dqUTJ2OURyWTVlM2NvMGVsTCsyZEJmXG5vRFFNQW5sWW1EaWlvcFBZZVl3Yks0MUIxRTJPMk5uY3ZOOHFtTzhXTVFLQmdRRHdLcVVkZmNLS29NTDRGYmJyXG5QS2lmMG9IY0Z1enA3Y3hNVmFwOU9Kb0RPclVadlRTZTc0dFBQT0YxZDdLVisvU1lTQ0RhV0NMT0w3V2ZWazluXG52dnRVMXFOSWt1SXBBcHVGeWI5V0RTSzVucHNkUWdaNkRzbG9TRmpqWVlVbWtLd0lxWjFheHZnOVdoTkFubDVwXG5JOHdZZXVHL3lDM212WGtYZEVNN3czQ0ZHd0tCZ1FEYXYyUWtTUTNVbmMvQzdhcTR0R0U2enY0SXBaZ0wxL1IwXG45RUp2WTAxSi9qTXJiZHhDcjBQeVpvUWk3b09OYkFTVS9lRnBhcmgyMWhjSVljaE13bGt2ZHZYT3hCMTFDZmJMXG4rNUtBWTJiU1drYVhSL2JwNFJXUUZ1cWhBZUpGbVNnSzc3RHUxN1BoYk9VNXRVNzlaVE12VDI2WHhYUDJiUllIXG5NRldENXovNjNRS0JnRG9tV1N3MjB1KzExUDgwWXNHNlFpblFVbGp6eEJFdjNwTnMrb2F2T2JzbWI4cjNvTklLXG50ZlJOalZsZnpnRzZxNUpqaEhEWmZqUG
+    const encodedKey = `YOUR_BASE64_KEY_STRING_HERE`;
+    const credentials = JSON.parse(Buffer.from(encodedKey, 'base64').toString('ascii'));
+
+    const auth = new GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+
+    const client = await auth.getClient();
+    const audience = 'https://us-central1-strategic-tender-rfp.cloudfunctions.net/summarize_rfp';
+    const idToken = await client.idToken.fetchIdToken(audience);
+
+    const response = await axios.post(audience, { rfpContent }, {
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const summary = response.data.choices[0].message.content;
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ summary })
+    };
+  } catch (error) {
+    console.error("Error:", error.message);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'An unexpected error occurred' })
+    };
+  }
+};
