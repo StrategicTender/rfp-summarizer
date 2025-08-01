@@ -50,4 +50,5 @@ const summary = response.data.choices[0].message.content;
 return {
   statusCode: 200,
   body: JSON.stringify({ summary })
-};
+};≈y
+
