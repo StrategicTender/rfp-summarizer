@@ -1,6 +1,14 @@
 [build]
   publish = "public"
-  functions = "netlify/functions/summarize-rfp"
+  command = "pip install -r netlify/functions/requirements.txt && echo 'Netlify build complete!'"
 
 [functions]
-  python_version = "3.9"
+  directory = "netlify/functions"
+
+[[plugins]]
+  package = "netlify-plugin-python"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

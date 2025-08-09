@@ -1,71 +1,57 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const rfpFileInput = document.getElementById("rfpFileInput");
-    const summarizeButton = document.getElementById("summarizeButton");
-    const loadingDiv = document.getElementById("loading");
-    const errorDiv = document.getElementById("error");
-    const summaryOutputDiv = document.getElementById("summaryOutput");
-    const summaryTextP = document.getElementById("summaryText");
+const fileInput = document.getElementById('fileInput');
+const summarizeBtn = document.getElementById('summarizeBtn');
+const loadingSpinner = document.getElementById('loadingSpinner');
+const resultOutput = document.getElementById('result');
 
-    let uploadedFile = null;
+// Enable the button when a file is selected
+fileInput.addEventListener('change', () => {
+  summarizeBtn.disabled = !fileInput.files.length;
+});
 
-    rfpFileInput.addEventListener("change", (event) => {
-        uploadedFile = event.target.files[0];
-        if (uploadedFile) {
-            summarizeButton.disabled = false;
-            errorDiv.classList.add("hidden");
-            summaryOutputDiv.classList.add("hidden");
-        } else {
-            summarizeButton.disabled = true;
-        }
-    });
+summarizeBtn.addEventListener('click', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
 
-    summarizeButton.addEventListener("click", async () => {
-        if (!uploadedFile) {
-            alert("Please select an RFP file first.");
-            return;
-        }
+  loadingSpinner.style.display = 'block';
+  resultOutput.textContent = '';
 
-        loadingDiv.classList.remove("hidden");
-        errorDiv.classList.add("hidden");
-        summaryOutputDiv.classList.add("hidden");
-        summaryTextP.textContent = "";
+  const reader = new FileReader();
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64Content = e.target.result.split(',')[1]; // Get only the base64 part
-            const fileType = uploadedFile.type;
-            const fileName = uploadedFile.name;
+  reader.onload = async function () {
+    const arrayBuffer = reader.result;
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-            try {
-                const response = await fetch("/.netlify/functions/summarize-rfp", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        fileContent: base64Content,
-                        fileType: fileType,
-                        fileName: fileName,
-                    }),
-                });
+    // Convert to base64
+    const base64String = btoa(String.fromCharCode(...uint8Array));
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || errorData.error || "Something went wrong during summarization.");
-                }
+    try {
+      const response = await fetch('https://summarize-rfp-v2-293196834043.us-central1.run.app/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          content: base64String,
+        })
+      });
 
-                const data = await response.json();
-                summaryTextP.textContent = data.summary;
-                summaryOutputDiv.classList.remove("hidden");
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
 
-            } catch (error) {
-                console.error("Error:", error);
-                errorDiv.textContent = `Error: ${error.message}`;
-                errorDiv.classList.remove("hidden");
-            } finally {
-                loadingDiv.classList.add("hidden");
-            }
-        };
-        reader.readAsDataURL(uploadedFile); // Read file as Data URL (base64)
-    });
+      const data = await response.json();
+      resultOutput.textContent = data.summary || 'No summary received.';
+    } catch (err) {
+      console.error(err);
+      resultOutput.textContent = '❌ Error: Failed to load summary.';
+    } finally {
+      loadingSpinner.style.display = 'none';
+    }
+  };
+
+  reader.onerror = function () {
+    loadingSpinner.style.display = 'none';
+    resultOutput.textContent = '❌ Error reading file.';
+  };
+
+  reader.readAsArrayBuffer(file); // ✅ Works with all file types + Safari
 });
