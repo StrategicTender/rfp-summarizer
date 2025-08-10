@@ -16,5 +16,8 @@
     "url": "https://github.com/StrategicTender/rfp-summarizer/issues"
   },
   "homepage": "https://github.com/StrategicTender/rfp-summarizer#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "google-auth-library": "^10.2.1"
+  }
 }
