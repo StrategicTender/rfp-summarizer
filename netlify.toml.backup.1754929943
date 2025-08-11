@@ -1,8 +1,11 @@
 [build]
-  command = "npm run build --if-present"
   publish = "public"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["google-auth-library"]
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
