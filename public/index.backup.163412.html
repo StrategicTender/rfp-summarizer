@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Strategic Tender – RFP Summarizer</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <img src="./logo.png" alt="Strategic Tender" class="logo" />
+    <h1>RFP Summarizer</h1>
+    <p class="subtitle">Upload a government RFP and get an instant summary.</p>
+
+    <div class="uploader">
+      <input id="rfpFile" type="file" accept="application/pdf,.pdf" />
+      <button id="summarizeBtn" disabled>Summarize RFP</button>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <pre id="result" class="result"></pre>
+  </main>
+
+  <script>
+    // INLINE, bulletproof
+    (function () {
+      var fileInput = document.getElementById('rfpFile');
+      var btn = document.getElementById('summarizeBtn');
+      var statusEl = document.getElementById('status');
+      var resultEl = document.getElementById('result');
+
+      function setStatus(m){ statusEl.textContent = m || ''; }
+      function setResult(m){ resultEl.textContent = m || ''; }
+
+      function enableIfValid(){
+        var f = fileInput.files && fileInput.files[0];
+        if(!f){ btn.disabled = true; return; }
+        var isPdf = (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
+        btn.disabled = !isPdf;
+        setStatus(isPdf ? ('Ready: ' + f.name) : 'Please choose a PDF file.');
+      }
+
+      // Enable button even if external JS fails
+      fileInput.addEventListener('change', enableIfValid);
+      // Also enable if the browser pre-fills on reload
+      window.addEventListener('DOMContentLoaded', enableIfValid);
+
+      btn.addEventListener('click', function () {
+        var f = fileInput.files && fileInput.files[0];
+        if(!f) return;
+        setResult('');
+        setStatus('Uploading and summarizing…');
+
+        var form = new FormData();
+        form.append('file', f, f.name);
+
+        fetch('/.netlify/functions/summarizer-proxy', { method: 'POST', body: form })
+          .then(function (resp) {
+            if(!resp.ok) return resp.text().then(function(t){ throw new Error('HTTP ' + resp.status + ' ' + resp.statusText + (t?'\n'+t:'')); });
+            var ct = resp.headers.get('content-type') || '';
+            if(ct.indexOf('application/json') !== -1) return resp.json().then(function(j){ return j.summary || JSON.stringify(j, null, 2); });
+            return resp.text();
+          })
+          .then(function (out) {
+            setStatus('Done.');
+            setResult(out || '(No content returned)');
+          })
+          .catch(function (e) {
+            setStatus('Failed.');
+            setResult(String(e && e.message ? e.message : e));
+            console.error(e);
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "id": "smoke-live",
+  "title": "Smoke Live Test",
+  "procurement_method": "RFP",
+  "buyer": { "name": "Parks Canada", "jurisdiction": "CA-federal" },
+  "industry_tags": ["equipment", "services"],
+  "trade_agreements": ["CUSMA", "CFTA"],
+  "language": "en",
+  "issue_date": "2025-08-12",
+  "closing_date": "2025-08-20T17:00:00-04:00",
+  "category": "Services",
+  "source": "live-check",
+  "contact": { "name": "Procurement Office", "email": "procurement@example.com" },
+  "attachments": [],
+  "urls": [],
+  "summary": "Smoke test summary.",
+  "text": "This procurement is subject to CUSMA (USMCA) and ACEUM obligations."
+}

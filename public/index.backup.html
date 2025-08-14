@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Strategic Tender – RFP Summarizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <img src="logo.jpeg" alt="Strategic Tender Logo" class="logo">
+    <h1>RFP Summarizer</h1>
+    <p>Upload a government RFP and get an instant summary.</p>
+
+    <input type="file" id="fileInput" accept=".pdf,.txt">
+    <button id="summarizeBtn" disabled>Summarize RFP</button>
+
+    <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+    <pre id="result" class="result-box"></pre>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

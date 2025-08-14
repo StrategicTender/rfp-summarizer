@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Strategic Tender — RFP Summarizer (Local)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="st-header">
+    <div class="st-wrap">
+      <h1>Strategic Tender – RFP Summarizer</h1>
+      <p class="st-sub">Local test on {{ now.strftime("%Y-%m-%d %H:%M") }}</p>
+    </div>
+  </header>
+
+  <main class="st-wrap">
+    <section class="st-card">
+      <h2 class="st-h2">Upload an RFP (PDF)</h2>
+      <form class="st-form" method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+        <label class="st-file">
+          <input id="file" type="file" name="file" accept="application/pdf" required />
+          <span id="fileLabel">Choose a PDF…</span>
+        </label>
+        <button id="go" class="st-btn" disabled>Summarize</button>
+      </form>
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
+      <div class="st-alert">
+        {% for m in messages %}<div>{{ m }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('file');
+    const fileLabel = document.getElementById('fileLabel');
+    const goBtn = document.getElementById('go');
+    fileInput.addEventListener('change', () => {
+      const name = fileInput.files?.[0]?.name || 'Choose a PDF…';
+      fileLabel.textContent = name;
+      goBtn.disabled = !fileInput.files?.length;
+    });
+  </script>
+</body>
+</html>

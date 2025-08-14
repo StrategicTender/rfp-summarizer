@@ -1,62 +1,66 @@
 // netlify/functions/summarizer-proxy.js
-const { GoogleAuth } = require('google-auth-library');
+const { getIdTokenHeader } = require('./_auth');
 
 const ORIGIN = process.env.CORS_ORIGIN || '*';
-const TARGET = process.env.GCP_FUNCTION_URL || process.env.GCF_INVOKE_URL;
+const TARGET = process.env.BACKEND_URL;                     // Cloud Run URL (no trailing slash)
+const AUD    = process.env.BACKEND_AUDIENCE || TARGET;      // audience for ID token
 
 exports.handler = async (event) => {
   // CORS preflight
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': ORIGIN,
-        'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400',
-      },
-      body: '',
-    };
+    return { statusCode: 204, headers: cors(), body: '' };
   }
 
-  if (!TARGET) return { statusCode: 500, body: JSON.stringify({ error: 'GCP_FUNCTION_URL not set' }) };
-  if (!process.env.GCP_SA_KEY) return { statusCode: 500, body: JSON.stringify({ error: 'GCP_SA_KEY not set' }) };
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers: { ...cors(), allow: 'POST' }, body: 'Use POST' };
+  }
 
-  // Parse JSON safely
-  let payload = event.body;
-  try {
-    const ct = (event.headers['content-type'] || '').toLowerCase();
-    if (ct.includes('application/json')) payload = event.body ? JSON.parse(event.body) : {};
-  } catch {
-    payload = event.body || '';
+  if (!TARGET) {
+    return { statusCode: 500, headers: cors(), body: JSON.stringify({ error: 'BACKEND_URL not set' }) };
+  }
+
+  // Read/validate body
+  const ctHeader = (event.headers['content-type'] || event.headers['Content-Type'] || 'application/json').toLowerCase();
+  const raw = event.isBase64Encoded
+    ? Buffer.from(event.body || '', 'base64').toString('utf8')
+    : (event.body || '');
+
+  if (ctHeader.includes('application/json')) {
+    try { JSON.parse(raw || '{}'); }
+    catch { return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'invalid JSON body' }) }; }
   }
 
   try {
-    const credentials = JSON.parse(process.env.GCP_SA_KEY);
-    const auth = new GoogleAuth({ credentials });
-    const client = await auth.getIdTokenClient(TARGET);
+    // Get Google-signed ID token for Cloud Run
+    const authHdrs = await getIdTokenHeader(AUD);
 
-    const res = await client.request({
-      url: TARGET,
-      method: event.httpMethod || 'POST',
-      headers: { 'Content-Type': event.headers['content-type'] || 'application/json' },
-      data: payload,
-      timeout: 300000,
+    // Forward to backend
+    const resp = await fetch(TARGET, {
+      method: 'POST',
+      headers: { ...authHdrs, 'content-type': ctHeader },
+      body: raw,
     });
 
+    const buf  = Buffer.from(await resp.arrayBuffer());
+    const outCT = resp.headers.get('content-type') || 'application/octet-stream';
+    const isBin = /(application\/pdf|application\/octet-stream|image|audio|video)/i.test(outCT);
+
     return {
-      statusCode: res.status || 200,
-      headers: {
-        'Access-Control-Allow-Origin': ORIGIN,
-        'content-type': res.headers['content-type'] || 'text/plain',
-      },
-      body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data),
+      statusCode: resp.status,
+      headers: { ...cors(), 'content-type': outCT },
+      body: isBin ? buf.toString('base64') : buf.toString('utf8'),
+      isBase64Encoded: isBin,
     };
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { 'Access-Control-Allow-Origin': ORIGIN },
-      body: JSON.stringify({ error: 'Proxy failed', detail: String(err?.message || err) }),
-    };
+    return { statusCode: 502, headers: cors(), body: JSON.stringify({ error: 'Proxy failed', detail: String(err?.message || err) }) };
   }
 };
+
+function cors() {
+  return {
+    'Access-Control-Allow-Origin': ORIGIN,
+    'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}

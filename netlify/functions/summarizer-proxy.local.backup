@@ -1,0 +1,139 @@
+// netlify/functions/summarizer-proxy.js
+<<<<<<< Updated upstream
+const { GoogleAuth } = require('google-auth-library');
+
+const ORIGIN = process.env.CORS_ORIGIN || '*';
+const TARGET = process.env.GCP_FUNCTION_URL || process.env.GCF_INVOKE_URL;
+
+exports.handler = async (event) => {
+  // CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': ORIGIN,
+        'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+      },
+      body: '',
+    };
+  }
+
+  if (!TARGET) return { statusCode: 500, body: JSON.stringify({ error: 'GCP_FUNCTION_URL not set' }) };
+  if (!process.env.GCP_SA_KEY) return { statusCode: 500, body: JSON.stringify({ error: 'GCP_SA_KEY not set' }) };
+
+  // Parse JSON safely
+  let payload = event.body;
+  try {
+    const ct = (event.headers['content-type'] || '').toLowerCase();
+    if (ct.includes('application/json')) payload = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    payload = event.body || '';
+  }
+
+  try {
+    const credentials = JSON.parse(process.env.GCP_SA_KEY);
+    const auth = new GoogleAuth({ credentials });
+    const client = await auth.getIdTokenClient(TARGET);
+
+    const res = await client.request({
+      url: TARGET,
+      method: event.httpMethod || 'POST',
+      headers: { 'Content-Type': event.headers['content-type'] || 'application/json' },
+      data: payload,
+      timeout: 300000,
+    });
+
+    return {
+      statusCode: res.status || 200,
+      headers: {
+        'Access-Control-Allow-Origin': ORIGIN,
+        'content-type': res.headers['content-type'] || 'text/plain',
+      },
+      body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data),
+=======
+// Proxies browser requests to private Cloud Run using a signed ID token.
+
+const { GoogleAuth } = require('google-auth-library');
+
+const REQUIRED_ENVS = ['GCP_FUNCTION_URL', 'GCP_SA_KEY'];
+function need(k) {
+  if (!process.env[k]) throw new Error(`Missing required env: ${k}`);
+}
+
+exports.handler = async (event) => {
+  const corsOrigin = process.env.CORS_ORIGIN || '*';
+
+  try {
+    // Validate env
+    REQUIRED_ENVS.forEach(need);
+    const targetUrl = process.env.GCP_FUNCTION_URL;
+
+    // CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return {
+        statusCode: 204,
+        headers: {
+          'Access-Control-Allow-Origin': corsOrigin,
+          'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+          'Access-Control-Max-Age': '3600',
+        },
+        body: '',
+      };
+    }
+
+    // Only allow POST
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: { 'Access-Control-Allow-Origin': corsOrigin },
+        body: JSON.stringify({ error: 'Method not allowed' }),
+      };
+    }
+
+    // Build ID token client for Cloud Run audience (NO scopes here)
+    const saJson = JSON.parse(process.env.GCP_SA_KEY);
+    const auth = new GoogleAuth({ credentials: saJson });
+    const client = await auth.getIdTokenClient(targetUrl);
+
+    // Forward JSON body to Cloud Run
+    let data = {};
+    if (event.body) {
+      try { data = JSON.parse(event.body); } catch { data = {}; }
+    }
+
+    const upstream = await client.request({
+      url: targetUrl,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data,
+    });
+
+    return {
+      statusCode: upstream.status,
+      headers: {
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(upstream.data),
+>>>>>>> Stashed changes
+    };
+  } catch (err) {
+    return {
+      statusCode: 500,
+<<<<<<< Updated upstream
+      headers: { 'Access-Control-Allow-Origin': ORIGIN },
+      body: JSON.stringify({ error: 'Proxy failed', detail: String(err?.message || err) }),
+=======
+      headers: { 'Access-Control-Allow-Origin': corsOrigin },
+      body: JSON.stringify({
+        error: 'Proxy failed',
+        detail: err?.response?.data || err?.message || 'Unknown error',
+      }),
+>>>>>>> Stashed changes
+    };
+  }
+};
+

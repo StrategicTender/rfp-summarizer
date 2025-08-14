@@ -1,8 +1,6 @@
 [build]
-  command = "npm run build --if-present"
   publish = "public"
+  functions = "netlify/functions"
 
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-  external_node_modules = ["google-auth-library"]
+[dev]
+  port = 8888

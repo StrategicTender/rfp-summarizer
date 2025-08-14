@@ -5,3 +5,4 @@ __pycache__/
 .env
 # Local Netlify folder
 .netlify
+netlify/functions/_secrets/

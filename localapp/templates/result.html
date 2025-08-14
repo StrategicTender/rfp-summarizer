@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RFP Summary — Strategic Tender</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="st-header">
+    <div class="st-wrap">
+      <h1>RFP Summary</h1>
+      <a class="st-link" href="{{ url_for('index') }}">&larr; Back</a>
+    </div>
+  </header>
+
+  <main class="st-wrap">
+    <section class="st-card">
+      <div class="st-content">
+        {{ html }}
+      </div>
+    </section>
+  </main>
+</body>
+</html>

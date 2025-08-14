@@ -1,0 +1,20 @@
+[build]
+<<<<<<< Updated upstream
+  command = "npm run build --if-present"
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["google-auth-library"]
+=======
+  command = "npm run build || echo 'no build step'"
+  publish = "public"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/summarize"
+  to = "/.netlify/functions/summarizer-proxy"
+  status = 200
+
+>>>>>>> Stashed changes
