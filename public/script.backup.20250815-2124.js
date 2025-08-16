@@ -1,13 +1,13 @@
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Elements
+  // Elements (support both old & new IDs)
   const form = $('uploadForm') || null;
   const fileInput = $('rfpFile') || $('file');
   const btn = $('submitBtn') || $('go');
   const spinner = $('spinner') || $('loadingSpinner');
 
-  // Result panes
+  // Two result panes: HTML (#nice) and Raw JSON (#out)
   const htmlPane = $('nice') || $('resultOutput') || $('result') || null;
   const jsonPane = $('out') || null;
 
@@ -15,54 +15,23 @@
   const tabSummary = $('tab-summary');
   const tabRaw = $('tab-raw');
 
-  // Language toggle
-  const langEnBtn = $('lang-en');
-  const langFrBtn = $('lang-fr');
-  let currentLang = 'en';
-
-  // Endpoint
+  // Backend endpoint (relative + meta override)
   const BACKEND_BASE = (window.BACKEND_URL || document.querySelector('meta[name="backend-url"]')?.content || '').replace(/\/+$/,'');
   const ENDPOINT = (BACKEND_BASE || '') + '/summarize_rfp';
 
-  // Status
+  // UI helpers
   const statusLine = $('statusLine') || $('status') || (() => {
     const d = document.createElement('div'); d.id = 'statusLine';
     (htmlPane?.parentNode || jsonPane?.parentNode || document.body).insertBefore(d, (htmlPane || jsonPane) || null);
     return d;
   })();
+
   const setBusy = (b) => { try { spinner?.classList?.toggle('hidden', !b); } catch {} if (btn) btn.disabled = !!b; };
   const showStatus = (m) => { if (statusLine) statusLine.textContent = m; };
 
-  // --- Language detection + splitting ---
-  function isLikelyFrench(t) {
-    const s = (' ' + (t || '') + ' ').toLowerCase();
-    const diacritics = (s.match(/[éèêëàâîïôöùûçœ]/g) || []).length;
-    const hits = [' le ', ' la ', ' les ', ' des ', ' du ', ' de ', ' et ', ' à ', " l'", " d'", ' une ', ' un ',
-                  ' pour ', ' sur ', ' avec ', ' soumission ', ' présentation ', ' courriel ']
-      .reduce((n,w)=> n + (s.includes(w) ? 1 : 0), 0);
-    return diacritics >= 2 || hits >= 2;
-  }
-  function filterNodes(html, keepFrench) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html || '';
-    tmp.querySelectorAll('p, li').forEach(n => {
-      const txt = n.textContent || '';
-      const fr = isLikelyFrench(txt);
-      // Keep only the target language; neutrals (not detected as FR) go to EN.
-      if (keepFrench ? !fr : fr) n.remove();
-    });
-    return tmp.innerHTML;
-  }
-
-  let lastHtml = '';   // raw from backend
-  let enHtml = '';     // English-only
-  let frHtml = '';     // French-only
-
-  const renderLang = () => {
-    if (!htmlPane) return;
-    htmlPane.innerHTML = (currentLang === 'fr' ? frHtml : enHtml) || '<p>(No content)</p>';
+  const setResultHtml = (html) => {
+    if (htmlPane) htmlPane.innerHTML = html;
   };
-
   const setRaw = (text) => {
     if (jsonPane) {
       jsonPane.style.display = '';
@@ -74,36 +43,26 @@
   function showTab(which) {
     if (!htmlPane || !jsonPane) return;
     if (which === 'raw') {
-      htmlPane.style.display = 'none'; jsonPane.style.display = 'block';
+      htmlPane.style.display = 'none';
+      jsonPane.style.display = 'block';
       tabRaw?.classList.add('active');  tabSummary?.classList.remove('active');
     } else {
-      jsonPane.style.display = 'none'; htmlPane.style.display = 'block';
+      jsonPane.style.display = 'none';
+      htmlPane.style.display = 'block';
       tabSummary?.classList.add('active'); tabRaw?.classList.remove('active');
-      renderLang();
     }
   }
-
-  // Toggle handlers
-  function setLang(lang) {
-    currentLang = lang;
-    langEnBtn?.classList.toggle('active', lang === 'en');
-    langFrBtn?.classList.toggle('active', lang === 'fr');
-    if (htmlPane && htmlPane.style.display !== 'none') renderLang();
-  }
-  langEnBtn?.addEventListener('click', () => setLang('en'));
-  langFrBtn?.addEventListener('click', () => setLang('fr'));
-  setLang('en'); // default
 
   // Enable button when a file is chosen
   const onFileChange = () => { if (btn) btn.disabled = !(fileInput && fileInput.files && fileInput.files[0]); };
   fileInput?.addEventListener('change', onFileChange);
 
-  // Tabs
+  // Tab wiring
   tabSummary?.addEventListener('click', () => showTab('summary'));
   tabRaw?.addEventListener('click', () => showTab('raw'));
-  showTab('summary');
+  showTab('summary'); // default
 
-  // Upload via multipart/form-data
+  // Use multipart/form-data (best for large files)
   async function runSummarize() {
     const file = fileInput?.files?.[0];
     if (!file) return;
@@ -120,7 +79,7 @@
 
       const res = await fetch(ENDPOINT || '/summarize_rfp', {
         method: 'POST',
-        body: fd,
+        body: fd,              // IMPORTANT: do not set Content-Type manually
         signal: controller.signal
       }).catch((err) => { throw new Error(`Network error: ${err.message}`); });
       clearTimeout(timeout);
@@ -131,25 +90,19 @@
         throw new Error(`Backend ${res.status}: ${textErr.slice(0,500)}`);
       }
 
+      // Get both raw and parsed
       const text = await res.text();
-      setRaw(text);
-
-      let data;
+      setRaw(text); // populate Raw JSON tab
+      let data, html;
       try { data = JSON.parse(text); } catch {}
-      lastHtml = (data && (data.summary_html || data.html || data.summary)) || text || '<p>(No content returned)</p>';
+      html = (data && (data.summary_html || data.html || data.summary)) || text || '<p>(No content returned)</p>';
 
-      // Build language-specific views
-      enHtml = filterNodes(lastHtml, false);
-      frHtml = filterNodes(lastHtml, true);
-
-      renderLang();
+      setResultHtml(html);
       showTab('summary');
       showStatus('Done.');
     } catch (err) {
       console.error(err);
-      lastHtml = `<pre class="error">${String(err?.message || 'Unknown error').replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]))}</pre>`;
-      enHtml = lastHtml; frHtml = lastHtml;
-      renderLang();
+      setResultHtml(`<pre class="error">${escapeHtml(err?.message || 'Unknown error')}</pre>`);
       showTab('summary');
       showStatus('Failed.');
     } finally {
@@ -157,8 +110,10 @@
     }
   }
 
+  // Wire up actions
   if (form) form.addEventListener('submit', (e) => { e.preventDefault(); runSummarize(); });
   if (btn)  btn.addEventListener('click',  (e) => { e.preventDefault?.(); runSummarize(); });
 
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
   onFileChange();
 })();

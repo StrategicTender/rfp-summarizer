@@ -1,0 +1,11 @@
+{
+  "site_slug": "rfp-summarizer-final",
+  "prod_url": "https://rfp-summarizer-final.netlify.app",
+  "unique_deploy_url": "open ~/Projects/rfp-summarizer && open -a "Visual Studio Code" ~/Projects/rfp-summarizer",
+  "deploy_id": "open ~/Projects/rfp-summarizer && open -a "Visual Studio Code" ~/Projects/rfp-summarizer",
+  "netlify_timestamp": "DIR=~/Projects/rfp-summarizer; open "$DIR"; ( command -v code >/dev/null && code "$DIR" ) || open -b com.microsoft.VSCode "$DIR" || open -a "Visual Studio Code" "$DIR" || open -a "Code" "$DIR" || open -a "VSCodium" "$DIR" || echo "⚠️ VS Code not found. See note below."",
+  "app_permalink": "https://app.netlify.com/sites/rfp-summarizer-final/deploys/open ~/Projects/rfp-summarizer && open -a "Visual Studio Code" ~/Projects/rfp-summarizer",
+  "saved_at_local": "2025-08-13 20:58:22 MDT",
+  "git_tag": "stable-ui-2025-08-13",
+  "git_commit": "e2c445a"
+}

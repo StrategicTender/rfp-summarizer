@@ -4,3 +4,9 @@
 
 [dev]
   port = 8888
+# dev redirect (added by Horus)
+[[redirects]]
+  from = "/summarize_rfp"
+  to = "https://summarize-rfp-v2-293196834043.us-central1.run.app/summarize_rfp"
+  status = 200
+  force = true

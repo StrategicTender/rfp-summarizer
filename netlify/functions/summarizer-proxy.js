@@ -1,66 +1,89 @@
-// netlify/functions/summarizer-proxy.js
-const { getIdTokenHeader } = require('./_auth');
-
-const ORIGIN = process.env.CORS_ORIGIN || '*';
-const TARGET = process.env.BACKEND_URL;                     // Cloud Run URL (no trailing slash)
-const AUD    = process.env.BACKEND_AUDIENCE || TARGET;      // audience for ID token
+const { GoogleAuth } = require("google-auth-library");
 
 exports.handler = async (event) => {
-  // CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors(), body: '' };
+  const origin = event.headers?.origin || "*";
+  const baseHeaders = corsHeaders(origin);
+
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: baseHeaders };
   }
 
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: { ...cors(), allow: 'POST' }, body: 'Use POST' };
-  }
+  const {
+    BACKEND_URL,
+    BACKEND_AUDIENCE,
+    PREVIEW_SECRET,
+    GCP_SA_CLIENT_EMAIL,
+    GCP_SA_PRIVATE_KEY,
+    SA_EMAIL,
+    SA_KEY,
+  } = process.env;
 
-  if (!TARGET) {
-    return { statusCode: 500, headers: cors(), body: JSON.stringify({ error: 'BACKEND_URL not set' }) };
-  }
-
-  // Read/validate body
-  const ctHeader = (event.headers['content-type'] || event.headers['Content-Type'] || 'application/json').toLowerCase();
-  const raw = event.isBase64Encoded
-    ? Buffer.from(event.body || '', 'base64').toString('utf8')
-    : (event.body || '');
-
-  if (ctHeader.includes('application/json')) {
-    try { JSON.parse(raw || '{}'); }
-    catch { return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'invalid JSON body' }) }; }
+  if (!BACKEND_URL) {
+    return json(baseHeaders, 500, { error: "BACKEND_URL not set" });
   }
 
   try {
-    // Get Google-signed ID token for Cloud Run
-    const authHdrs = await getIdTokenHeader(AUD);
+    // Prefer SA_* if present; otherwise fall back to GCP_SA_* (the ones we set).
+    const email = SA_EMAIL || GCP_SA_CLIENT_EMAIL;
+    let key = SA_KEY || GCP_SA_PRIVATE_KEY;
+    if (key) key = key.replace(/\\n/g, "\n");
 
-    // Forward to backend
-    const resp = await fetch(TARGET, {
-      method: 'POST',
-      headers: { ...authHdrs, 'content-type': ctHeader },
-      body: raw,
+    // If we have explicit creds, use them; else let library try ADC.
+    const auth =
+      email && key
+        ? new GoogleAuth({ credentials: { client_email: email, private_key: key } })
+        : new GoogleAuth();
+
+    const audience = BACKEND_AUDIENCE || BACKEND_URL;
+    const client = await auth.getIdTokenClient(audience);
+    const authHeaders = await client.getRequestHeaders(BACKEND_URL);
+
+    const target = BACKEND_URL.replace(/\\/+$/, "") + "/v1/summarize";
+
+    // Pass the body through as-is (frontend sends JSON already)
+    const resp = await fetch(target, {
+      method: "POST",
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+        "X-Preview-Secret": PREVIEW_SECRET || "",
+      },
+      body: event.body || "{}",
     });
 
-    const buf  = Buffer.from(await resp.arrayBuffer());
-    const outCT = resp.headers.get('content-type') || 'application/octet-stream';
-    const isBin = /(application\/pdf|application\/octet-stream|image|audio|video)/i.test(outCT);
+    const text = await resp.text();
+    const outHeaders = { ...baseHeaders, "Content-Type": "application/json" };
 
-    return {
-      statusCode: resp.status,
-      headers: { ...cors(), 'content-type': outCT },
-      body: isBin ? buf.toString('base64') : buf.toString('utf8'),
-      isBase64Encoded: isBin,
-    };
+    if (!resp.ok) {
+      return {
+        statusCode: resp.status,
+        headers: outHeaders,
+        body: JSON.stringify({ http_status: resp.status, error: text }),
+      };
+    }
+
+    return { statusCode: 200, headers: outHeaders, body: text };
   } catch (err) {
-    return { statusCode: 502, headers: cors(), body: JSON.stringify({ error: 'Proxy failed', detail: String(err?.message || err) }) };
+    return json(baseHeaders, 502, {
+      http_status: 502,
+      error: String((err && err.stack) || err),
+    });
   }
 };
 
-function cors() {
+/* ---------- helpers ---------- */
+function corsHeaders(origin) {
   return {
-    'Access-Control-Allow-Origin': ORIGIN,
-    'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400',
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Preview-Secret",
+  };
+}
+
+function json(headers, status, obj) {
+  return {
+    statusCode: status,
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(obj),
   };
 }
