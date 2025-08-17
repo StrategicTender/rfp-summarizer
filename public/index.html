@@ -17,9 +17,11 @@
     button{background:var(--brand);color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:600;cursor:pointer}
     button[disabled]{opacity:.6;cursor:not-allowed}
     .tabs{margin-top:14px;display:flex;gap:10px;justify-content:center}
-    .tab{background:#e5edff;color:#123; border:0;border-radius:999px;padding:8px 14px}
+    .tab{background:#e5edff;color:#123;border:0;border-radius:999px;padding:8px 14px}
+    .tab[aria-pressed="true"]{background:#cfdcff}
     #spinner{display:none;margin-left:8px}
-    #resultOutput{max-width:760px;margin:20px auto;text-align:left}
+    #resultOutput{max-width:760px;margin:20px auto;text-align:left;white-space:normal}
+    pre.json{background:#0b1020;color:#d6e2ff;padding:14px;border-radius:12px;overflow:auto}
     .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
   </style>
 </head>
@@ -35,18 +37,17 @@
           <button id="summarizeBtn" type="button" disabled>Summarize RFP</button>
           <span id="spinner" aria-live="polite">⏳ Working…</span>
         </div>
-        <div class="tabs" aria-hidden="true">
-          <button type="button" class="tab">Summary</button>
-          <button type="button" class="tab">Raw JSON</button>
+        <div class="tabs">
+          <button id="tabSummary" type="button" class="tab" aria-pressed="true">Summary</button>
+          <button id="tabJson"    type="button" class="tab" aria-pressed="false">Raw JSON</button>
         </div>
       </form>
     </div>
 
     <div id="resultOutput"></div>
-    <p class="visually-hidden" id="buildTag">build: inline-wire v1</p>
+    <p class="visually-hidden" id="buildTag">build: inline-wire v2 + JSON tab</p>
   </div>
 
-  <!-- Inline wiring so the button always fires in production -->
   <script>
   (function(){
     const API_URL = 'https://summarize-rfp-v2-293196834043.us-central1.run.app/summarize_rfp';
@@ -55,16 +56,43 @@
     const btn = $('summarizeBtn');
     const file = $('pdfInput');
     const spin = $('spinner');
+    const tabSummary = $('tabSummary');
+    const tabJson = $('tabJson');
+
+    let lastJson = null;
+    let activeTab = 'summary';
 
     function setBusy(b){
       if (spin) spin.style.display = b ? 'inline-block' : 'none';
       if (btn) { btn.disabled = b; btn.setAttribute('aria-busy', String(b)); }
+    }
+    function setTab(name){
+      activeTab = name;
+      tabSummary.setAttribute('aria-pressed', String(name==='summary'));
+      tabJson.setAttribute('aria-pressed', String(name==='json'));
+      render();
     }
     function b64FromArrayBuffer(buf){
       let binary=''; const bytes=new Uint8Array(buf);
       for (let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]);
       return btoa(binary);
     }
+    function render(){
+      if (!lastJson){
+        out.innerHTML = '<p style="color:#6b7280">Run a summary first, then you can switch tabs.</p>';
+        return;
+      }
+      if (activeTab === 'json'){
+        out.innerHTML = '<pre class="json"></pre>';
+        out.querySelector('pre').textContent = JSON.stringify(lastJson, null, 2);
+      } else {
+        const missing = Array.isArray(lastJson.missing) ? lastJson.missing : [];
+        const html = (lastJson.summary_html || lastJson.page_html || '');
+        const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
+        out.innerHTML = (notice ? notice : '') + '<h2>Summary</h2>' + (html || '<p>(no html)</p>');
+      }
+    }
+
     async function run(){
       try{
         const f = file && file.files && file.files[0];
@@ -82,10 +110,9 @@
         const text = await res.text();
         let json; try { json = JSON.parse(text); } catch(e){ throw new Error(`Non-JSON (${res.status}) ${text.slice(0,200)}…`); }
         if(!res.ok) throw new Error(json && json.error ? json.error : `HTTP ${res.status}`);
-        const missing = Array.isArray(json.missing) ? json.missing : [];
-        const html = json.summary_html || json.page_html || '';
-        const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
-        out.innerHTML = (notice ? notice : '') + '<h2>Summary</h2>' + (html || '<p>(no html)</p>');
+
+        lastJson = json;               // save for JSON tab
+        setTab('summary');             // default to Summary after each run
       } catch(err){
         console.error(err);
         out.innerHTML = `<pre style="white-space:pre-wrap">Error: ${String(err.message || err)}</pre>`;
@@ -95,12 +122,11 @@
 
     document.addEventListener('DOMContentLoaded', function(){
       setBusy(false);
-      if (file && btn){
-        btn.addEventListener('click', function(ev){ ev.preventDefault(); run(); });
-        file.addEventListener('change', function(){ btn.disabled = !(file.files && file.files.length > 0); });
-        // Enable immediately if browser restored prior selection
-        btn.disabled = !(file.files && file.files.length > 0) ? true : false;
-      }
+      render();
+      btn.addEventListener('click', function(ev){ ev.preventDefault(); run(); });
+      file.addEventListener('change', function(){ btn.disabled = !(file.files && file.files.length > 0); });
+      tabSummary.addEventListener('click', function(){ setTab('summary'); });
+      tabJson.addEventListener('click', function(){ setTab('json'); });
     });
   })();
   </script>
