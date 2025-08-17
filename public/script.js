@@ -1,164 +1,75 @@
+/* Strategic Tender — RFP Summarizer UI glue (form-safe)
+   Prevents default form submit so the chosen file stays selected. */
+
 (() => {
+  const API_BASE = 'https://summarize-rfp-v2-293196834043.us-central1.run.app';
+  const API_URL  = API_BASE + '/summarize_rfp';
+
   const $ = (id) => document.getElementById(id);
+  const out = $('resultOutput') || $('out');
+  const btn = $('summarizeBtn') || $('btn');
+  const fileInput = $('pdfInput') || $('file');
+  const spinner = $('spinner') || $('loading');
+  const form = $('summarizeForm') || document.querySelector('form');
 
-  // Elements
-  const form = $('uploadForm') || null;
-  const fileInput = $('rfpFile') || $('file');
-  const btn = $('submitBtn') || $('go');
-  const spinner = $('spinner') || $('loadingSpinner');
+  if (form) form.addEventListener('submit', (e) => e.preventDefault());
+  if (btn && btn.getAttribute('type') !== 'button') btn.setAttribute('type', 'button');
 
-  // Result panes
-  const htmlPane = $('nice') || $('resultOutput') || $('result') || null;
-  const jsonPane = $('out') || null;
-
-  // Tabs
-  const tabSummary = $('tab-summary');
-  const tabRaw = $('tab-raw');
-
-  // Language toggle
-  const langEnBtn = $('lang-en');
-  const langFrBtn = $('lang-fr');
-  let currentLang = 'en';
-
-  // Endpoint
-  const BACKEND_BASE = (window.BACKEND_URL || document.querySelector('meta[name="backend-url"]')?.content || '').replace(/\/+$/,'');
-  const ENDPOINT = (BACKEND_BASE || '') + '/summarize_rfp';
-
-  // Status
-  const statusLine = $('statusLine') || $('status') || (() => {
-    const d = document.createElement('div'); d.id = 'statusLine';
-    (htmlPane?.parentNode || jsonPane?.parentNode || document.body).insertBefore(d, (htmlPane || jsonPane) || null);
-    return d;
-  })();
-  const setBusy = (b) => { try { spinner?.classList?.toggle('hidden', !b); } catch {} if (btn) btn.disabled = !!b; };
-  const showStatus = (m) => { if (statusLine) statusLine.textContent = m; };
-
-  // --- Language detection + splitting ---
-  function isLikelyFrench(t) {
-    const s = (' ' + (t || '') + ' ').toLowerCase();
-    const diacritics = (s.match(/[éèêëàâîïôöùûçœ]/g) || []).length;
-    const hits = [' le ', ' la ', ' les ', ' des ', ' du ', ' de ', ' et ', ' à ', " l'", " d'", ' une ', ' un ',
-                  ' pour ', ' sur ', ' avec ', ' soumission ', ' présentation ', ' courriel ']
-      .reduce((n,w)=> n + (s.includes(w) ? 1 : 0), 0);
-    return diacritics >= 2 || hits >= 2;
-  }
-  function filterNodes(html, keepFrench) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html || '';
-    tmp.querySelectorAll('p, li').forEach(n => {
-      const txt = n.textContent || '';
-      const fr = isLikelyFrench(txt);
-      // Keep only the target language; neutrals (not detected as FR) go to EN.
-      if (keepFrench ? !fr : fr) n.remove();
-    });
-    return tmp.innerHTML;
+  function setBusy(b) {
+    if (spinner) spinner.style.display = b ? 'inline-block' : 'none';
+    if (btn) { btn.disabled = b; btn.ariaBusy = String(b); }
   }
 
-  let lastHtml = '';   // raw from backend
-  let enHtml = '';     // English-only
-  let frHtml = '';     // French-only
-
-  const renderLang = () => {
-    if (!htmlPane) return;
-    htmlPane.innerHTML = (currentLang === 'fr' ? frHtml : enHtml) || '<p>(No content)</p>';
-  };
-
-  const setRaw = (text) => {
-    if (jsonPane) {
-      jsonPane.style.display = '';
-      jsonPane.readOnly = true;
-      jsonPane.value = text;
-    }
-  };
-
-  function showTab(which) {
-    if (!htmlPane || !jsonPane) return;
-    if (which === 'raw') {
-      htmlPane.style.display = 'none'; jsonPane.style.display = 'block';
-      tabRaw?.classList.add('active');  tabSummary?.classList.remove('active');
-    } else {
-      jsonPane.style.display = 'none'; htmlPane.style.display = 'block';
-      tabSummary?.classList.add('active'); tabRaw?.classList.remove('active');
-      renderLang();
-    }
+  function b64FromArrayBuffer(buf) {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
   }
 
-  // Toggle handlers
-  function setLang(lang) {
-    currentLang = lang;
-    langEnBtn?.classList.toggle('active', lang === 'en');
-    langFrBtn?.classList.toggle('active', lang === 'fr');
-    if (htmlPane && htmlPane.style.display !== 'none') renderLang();
-  }
-  langEnBtn?.addEventListener('click', () => setLang('en'));
-  langFrBtn?.addEventListener('click', () => setLang('fr'));
-  setLang('en'); // default
-
-  // Enable button when a file is chosen
-  const onFileChange = () => { if (btn) btn.disabled = !(fileInput && fileInput.files && fileInput.files[0]); };
-  fileInput?.addEventListener('change', onFileChange);
-
-  // Tabs
-  tabSummary?.addEventListener('click', () => showTab('summary'));
-  tabRaw?.addEventListener('click', () => showTab('raw'));
-  showTab('summary');
-
-  // Upload via multipart/form-data
-  async function runSummarize() {
-    const file = fileInput?.files?.[0];
-    if (!file) return;
-
-    setBusy(true);
-    showStatus(`Uploading ${file.name} (${Math.round(file.size/1024)} KB)...`);
-
+  async function run() {
     try {
-      const fd = new FormData();
-      fd.append('file', file, file.name);
+      const f = fileInput?.files?.[0];
+      if (!f) { alert('Choose a PDF first.'); return; }
+      setBusy(true);
+      out && (out.innerHTML = '<p>Uploading & summarizing…</p>');
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+      const buf = await f.arrayBuffer();
+      const b64 = b64FromArrayBuffer(buf);
 
-      const res = await fetch(ENDPOINT || '/summarize_rfp', {
+      const res = await fetch(API_URL, {
         method: 'POST',
-        body: fd,
-        signal: controller.signal
-      }).catch((err) => { throw new Error(`Network error: ${err.message}`); });
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        const textErr = await res.text();
-        setRaw(textErr);
-        throw new Error(`Backend ${res.status}: ${textErr.slice(0,500)}`);
-      }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: f.name,
+          content: b64,
+          options: { language: 'en' }
+        }),
+      });
 
       const text = await res.text();
-      setRaw(text);
+      let json;
+      try { json = JSON.parse(text); }
+      catch { throw new Error(`Non-JSON response (${res.status}). Body: ${text.slice(0,300)}…`); }
+      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
 
-      let data;
-      try { data = JSON.parse(text); } catch {}
-      lastHtml = (data && (data.summary_html || data.html || data.summary)) || text || '<p>(No content returned)</p>';
+      const missing = Array.isArray(json?.missing) ? json.missing : [];
+      const html = json?.summary_html || json?.page_html || '';
+      const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
 
-      // Build language-specific views
-      enHtml = filterNodes(lastHtml, false);
-      frHtml = filterNodes(lastHtml, true);
-
-      renderLang();
-      showTab('summary');
-      showStatus('Done.');
+      if (out) out.innerHTML = (notice ? notice : '') + `<h2>Summary</h2>` + (html || '<p>(no html)</p>');
     } catch (err) {
       console.error(err);
-      lastHtml = `<pre class="error">${String(err?.message || 'Unknown error').replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]))}</pre>`;
-      enHtml = lastHtml; frHtml = lastHtml;
-      renderLang();
-      showTab('summary');
-      showStatus('Failed.');
-    } finally {
-      setBusy(false);
-    }
+      out && (out.innerHTML = `<pre style="white-space:pre-wrap">Error: ${String(err.message || err)}</pre>`);
+      alert(`Error: ${String(err.message || err)}`);
+    } finally { setBusy(false); }
   }
 
-  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); runSummarize(); });
-  if (btn)  btn.addEventListener('click',  (e) => { e.preventDefault?.(); runSummarize(); });
-
-  onFileChange();
+  window.addEventListener('DOMContentLoaded', () => {
+    setBusy(false);
+    if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); run(); });
+    if (fileInput && btn) btn.addEventListener('change', () => {
+      btn.disabled = !(fileInput.files && fileInput.files.length > 0);
+    });
+  });
 })();
