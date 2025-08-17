@@ -1,380 +1,64 @@
-/* Strategic Tender — RFP Summarizer UI glue (form-safe)
-   Prevents default form submit so the chosen file stays selected. */
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>RFP Summarizer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <style>
+    :root { --bg:#f7f8fc; --card:#fff; --text:#14213d; --muted:#6b7280; --brand:#2563eb; --brand-2:#1d4ed8; --ring:#bfdbfe; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;}
+    .wrap{max-width:960px;margin:56px auto;padding:0 20px;}
+    h1{font-size:40px;margin:8px 0 24px 0;text-align:center;}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:22px;margin:0 auto 20px;}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+    input[type=file]{padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;min-width:320px}
+    .btn{border:0;border-radius:10px;padding:10px 16px;background:#e5e7eb;color:#111;cursor:pointer;font-weight:600}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .btn.primary{background:var(--brand);color:#fff}
+    .btn.primary:hover{background:var(--brand-2)}
+    .tabs{display:flex;gap:10px;margin-top:14px;justify-content:center}
+    .pill{border:1px solid #e5e7eb;border-radius:999px;padding:8px 14px;background:#fff;cursor:pointer}
+    .pill.active{background:var(--brand);border-color:var(--brand);color:#fff}
+    .muted{color:var(--muted)}
+    #downloadBar{margin-top:12px;display:flex;gap:8px;justify-content:center}
+    #out{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:18px;min-height:120px}
+    pre{background:#0b1020;color:#dbeafe;border-radius:12px;padding:14px;overflow:auto}
+    .hidden{display:none}
+    .center{display:flex;justify-content:center;align-items:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>RFP Summarizer</h1>
 
-(() => {
-  const API_BASE = 'https://summarize-rfp-v2-293196834043.us-central1.run.app';
-  const API_URL  = API_BASE + '/summarize_rfp';
+    <div class="card">
+      <div class="row">
+        <input id="file" type="file" accept=".pdf,.PDF" />
+        <button id="btn" class="btn primary">Summarize RFP</button>
+      </div>
 
-  const $ = (id) => document.getElementById(id);
-  const out = $('resultOutput') || $('out');
-  const btn = $('summarizeBtn') || $('btn');
-  const fileInput = $('pdfInput') || $('file');
-  const spinner = $('spinner') || $('loading');
-  const form = $('summarizeForm') || document.querySelector('form');
+      <div class="tabs">
+        <button id="tabSummary" class="pill active">Summary</button>
+        <button id="tabJson" class="pill">Raw JSON</button>
+      </div>
 
-  if (form) form.addEventListener('submit', (e) => e.preventDefault());
-  if (btn && btn.getAttribute('type') !== 'button') btn.setAttribute('type', 'button');
+      <div id="downloadBar">
+        <button id="dlHtmlBtn" class="btn" disabled>Download Summary (HTML)</button>
+        <button id="dlJsonBtn" class="btn" disabled>Download Raw JSON</button>
+      </div>
+    </div>
 
-  function setBusy(b) {
-    if (spinner) spinner.style.display = b ? 'inline-block' : 'none';
-    if (btn) { btn.disabled = b; btn.ariaBusy = String(b); }
-  }
+    <div id="panelSummary">
+      <div id="out"><p class="muted center">Upload a PDF and click <strong>Summarize RFP</strong>.</p></div>
+    </div>
 
-  function b64FromArrayBuffer(buf) {
-    let binary = '';
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }
+    <div id="panelJson" class="hidden">
+      <pre id="json">{}</pre>
+    </div>
+  </div>
 
-  async function run() {
-    try {
-      const f = fileInput?.files?.[0];
-      if (!f) { alert('Choose a PDF first.'); return; }
-      setBusy(true);
-      out && (out.innerHTML = '<p>Uploading & summarizing…</p>');
-
-      const buf = await f.arrayBuffer();
-      const b64 = b64FromArrayBuffer(buf);
-
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: f.name,
-          content: b64,
-          options: { language: 'en' }
-        }),
-      });
-
-      const text = await res.text();
-      let json;
-      try { json = JSON.parse(text); }
-      catch { throw new Error(`Non-JSON response (${res.status}). Body: ${text.slice(0,300)}…`); }
-      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-
-      const missing = Array.isArray(json?.missing) ? json.missing : [];
-      const html = json?.summary_html || json?.page_html || '';
-      const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
-
-      if (out) out.innerHTML = (notice ? notice : '') + `<h2>Summary</h2>` + (html || '<p>(no html)</p>');
-    } catch (err) {
-      console.error(err);
-      out && (out.innerHTML = `<pre style="white-space:pre-wrap">Error: ${String(err.message || err)}</pre>`);
-      alert(`Error: ${String(err.message || err)}`);
-    } finally { setBusy(false); }
-  }
-
-  window.addEventListener('DOMContentLoaded', () => {
-    setBusy(false);
-    if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); run(); });
-    if (fileInput && btn) btn.addEventListener('change', () => {
-      btn.disabled = !(fileInput.files && fileInput.files.length > 0);
-    });
-  });
-})();
-
-
-// ---- export helpers (appended) ----
-(function(){
-  function downloadText(filename, mime, text) {
-    try {
-      const blob = new Blob([text], {type: mime});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-    } catch(e){ alert('Download failed: ' + e); }
-  }
-
-  
-// ---- Download buttons (HTML & JSON)
-function ensureDownloadButtons() {
-  // try to attach near the top controls; fall back to <form> or <body>
-  const host = document.querySelector('.controls') || document.querySelector('form') || document.body;
-  if (!document.getElementById('dlHtmlBtn')) {
-    const bar = document.createElement('div');
-    bar.className = 'downloads';
-    bar.style.marginTop = '8px';
-
-    const htmlBtn = document.createElement('button');
-    htmlBtn.id = 'dlHtmlBtn';
-    htmlBtn.className = 'btn';
-    htmlBtn.textContent = 'Download Summary (HTML)';
-    htmlBtn.disabled = true;
-    bar.appendChild(htmlBtn);
-
-    const jsonBtn = document.createElement('button');
-    jsonBtn.id = 'dlJsonBtn';
-    jsonBtn.className = 'btn';
-    jsonBtn.style.marginLeft = '8px';
-    jsonBtn.textContent = 'Download Raw JSON';
-    jsonBtn.disabled = true;
-    bar.appendChild(jsonBtn);
-
-    host.appendChild(bar);
-
-    htmlBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!lastJson) return;
-      const title = `Summary: ${lastJson.rfp_no || 'RFP'}`;
-      const html = '<!doctype html><meta charset="utf-8"><title>'+title+'</title><body>'+(lastJson.summary_html || '<p>(no HTML)</p>')+'</body>';
-      triggerDownload(new Blob([html], { type: 'text/html' }), (lastJson.rfp_no || 'RFP') + '-summary.html');
-    });
-
-    jsonBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!lastJson) return;
-      triggerDownload(new Blob([JSON.stringify(lastJson, null, 2)], { type: 'application/json' }), (lastJson.rfp_no || 'RFP') + '.json');
-    });
-  }
-  // enable/disable state
-  const hb = document.getElementById('dlHtmlBtn'), jb = document.getElementById('dlJsonBtn');
-  const has = !!lastJson;
-  if (jb) jb.disabled = !has;
-  if (hb) hb.disabled = !has || !lastJson?.summary_html;
-}
-
-
-document.addEventListener('DOMContentLoaded', () => {
-    const tabs = document.querySelector('.tabs');
-    if(!tabs) return;
-
-    if(!document.getElementById('btnDownloadJson')){
-      const btnJson = document.createElement('button');
-      btnJson.id = 'btnDownloadJson';
-      btnJson.type = 'button';
-      btnJson.className = 'tab';
-      btnJson.textContent = 'Download JSON';
-      btnJson.addEventListener('click', () => {
-        if (!window.lastJson) { alert('Run a summary first.'); return; }
-        const pretty = JSON.stringify(window.lastJson, null, 2);
-        downloadText('rfp-summary.json', 'application/json', pretty);
-      });
-      tabs.appendChild(btnJson);
-    }
-
-    if(!document.getElementById('btnDownloadHtml')){
-      const btnHtml = document.createElement('button');
-      btnHtml.id = 'btnDownloadHtml';
-      btnHtml.type = 'button';
-      btnHtml.className = 'tab';
-      btnHtml.textContent = 'Download HTML';
-      btnHtml.addEventListener('click', () => {
-        if (!window.lastJson || !(window.lastJson.summary_html || window.lastJson.page_html)) {
-          alert('No HTML available yet. Run a summary first.'); return;
-        }
-        const body = (window.lastJson.summary_html || window.lastJson.page_html || '');
-        const doc = `<!doctype html><html><head><meta charset="utf-8"><title>RFP Summary</title></head><body>${body}</body></html>`;
-        downloadText('rfp-summary.html', 'text/html', doc);
-      });
-      tabs.appendChild(btnHtml);
-    }
-  });
-})();
-
-
-/* UTIL_EXPORTS */
-(function(){
-  function downloadText(filename, mime, text){
-    try{
-      const blob=new Blob([text],{type:mime});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob); a.download=filename;
-      document.body.appendChild(a); a.click();
-      setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0);
-    }catch(e){ alert('Download failed: '+e); }
-  }
-  async function copyText(text){
-    try{ await navigator.clipboard.writeText(text); }
-    catch(e){ alert('Copy failed: '+e); }
-  }
-  
-// ---- Download buttons (HTML & JSON)
-function ensureDownloadButtons() {
-  // try to attach near the top controls; fall back to <form> or <body>
-  const host = document.querySelector('.controls') || document.querySelector('form') || document.body;
-  if (!document.getElementById('dlHtmlBtn')) {
-    const bar = document.createElement('div');
-    bar.className = 'downloads';
-    bar.style.marginTop = '8px';
-
-    const htmlBtn = document.createElement('button');
-    htmlBtn.id = 'dlHtmlBtn';
-    htmlBtn.className = 'btn';
-    htmlBtn.textContent = 'Download Summary (HTML)';
-    htmlBtn.disabled = true;
-    bar.appendChild(htmlBtn);
-
-    const jsonBtn = document.createElement('button');
-    jsonBtn.id = 'dlJsonBtn';
-    jsonBtn.className = 'btn';
-    jsonBtn.style.marginLeft = '8px';
-    jsonBtn.textContent = 'Download Raw JSON';
-    jsonBtn.disabled = true;
-    bar.appendChild(jsonBtn);
-
-    host.appendChild(bar);
-
-    htmlBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!lastJson) return;
-      const title = `Summary: ${lastJson.rfp_no || 'RFP'}`;
-      const html = '<!doctype html><meta charset="utf-8"><title>'+title+'</title><body>'+(lastJson.summary_html || '<p>(no HTML)</p>')+'</body>';
-      triggerDownload(new Blob([html], { type: 'text/html' }), (lastJson.rfp_no || 'RFP') + '-summary.html');
-    });
-
-    jsonBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!lastJson) return;
-      triggerDownload(new Blob([JSON.stringify(lastJson, null, 2)], { type: 'application/json' }), (lastJson.rfp_no || 'RFP') + '.json');
-    });
-  }
-  // enable/disable state
-  const hb = document.getElementById('dlHtmlBtn'), jb = document.getElementById('dlJsonBtn');
-  const has = !!lastJson;
-  if (jb) jb.disabled = !has;
-  if (hb) hb.disabled = !has || !lastJson?.summary_html;
-}
-
-
-document.addEventListener('DOMContentLoaded',()=>{
-    const tabs=document.querySelector('.tabs'); if(!tabs) return;
-
-    const makeBtn=(id,label,handler)=>{
-      if(document.getElementById(id)) return;
-      const b=document.createElement('button');
-      b.id=id; b.type='button'; b.className='tab'; b.textContent=label;
-      b.addEventListener('click',handler); tabs.appendChild(b);
-    };
-
-    makeBtn('btnCopyJson','Copy JSON',()=> {
-      if(!window.lastJson) return alert('Run a summary first.');
-      copyText(JSON.stringify(window.lastJson,null,2));
-    });
-    makeBtn('btnDownloadJson','Download JSON',()=> {
-      if(!window.lastJson) return alert('Run a summary first.');
-      downloadText('rfp-summary.json','application/json',
-                   JSON.stringify(window.lastJson,null,2));
-    });
-    makeBtn('btnCopyHtml','Copy HTML',()=> {
-      const html=(window.lastJson&& (lastJson.summary_html||lastJson.page_html))||'';
-      if(!html) return alert('No HTML yet. Run a summary first.');
-      copyText(html);
-    });
-    makeBtn('btnDownloadHtml','Download HTML',()=> {
-      const html=(window.lastJson&& (lastJson.summary_html||lastJson.page_html))||'';
-      if(!html) return alert('No HTML yet. Run a summary first.');
-      const doc='<!doctype html><html><head><meta charset="utf-8"><title>RFP Summary</title></head><body>'+html+'</body></html>';
-      downloadText('rfp-summary.html','text/html',doc);
-    });
-  });
-})();
-
-function triggerDownload(blob, filename){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=filename;
-  document.body.appendChild(a);
-  a.click();
-  URL.revokeObjectURL(a.href);
-  a.remove();
-}
-function enableDownloads(){
-  const has = typeof lastJson!=='undefined' && lastJson;
-  const jb=document.getElementById('dlJsonBtn');
-  const hb=document.getElementById('dlHtmlBtn');
-  if(jb) jb.disabled=!has;
-  if(hb) hb.disabled=!(has && lastJson.summary_html);
-}
-document.getElementById('dlJsonBtn')?.addEventListener('click', ()=>{
-  if(!lastJson) return;
-  const pretty=JSON.stringify(lastJson,null,2);
-  triggerDownload(new Blob([pretty],{type:'application/json'}),(lastJson.rfp_no||'rfp')+'.json');
-});
-document.getElementById('dlHtmlBtn')?.addEventListener('click', ()=>{
-  if(!lastJson || !lastJson.summary_html) return;
-  const title='Summary: '+(lastJson.rfp_no||'RFP');
-  const html='<!doctype html><html><meta charset="utf-8"><title>'+title+'</title><body>'+lastJson.summary_html+'</body></html>';
-  triggerDownload(new Blob([html],{type:'text/html'}),(lastJson.rfp_no||'rfp')+'-summary.html');
-});
-
-
-// ===== Download buttons (HTML + JSON) – safe, idempotent =====
-(() => {
-  if (window.__dlPatched) return; window.__dlPatched = true;
-
-  function fallbackDownload(blob, filename){
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  }
-  const doDownload = (window.triggerDownload || fallbackDownload);
-
-  function host(){
-    return document.querySelector('.controls') || document.querySelector('form') || document.body;
-  }
-
-  function ensureButtons(){
-    if (document.getElementById('dlHtmlBtn')) return;
-    const h = host();
-    const bar = document.createElement('div');
-    bar.className = 'downloads';
-    bar.style.marginTop = '8px';
-
-    const htmlBtn = document.createElement('button');
-    htmlBtn.id = 'dlHtmlBtn';
-    htmlBtn.className = 'btn';
-    htmlBtn.textContent = 'Download Summary (HTML)';
-    htmlBtn.disabled = true;
-
-    const jsonBtn = document.createElement('button');
-    jsonBtn.id = 'dlJsonBtn';
-    jsonBtn.className = 'btn';
-    jsonBtn.style.marginLeft = '8px';
-    jsonBtn.textContent = 'Download Raw JSON';
-    jsonBtn.disabled = true;
-
-    bar.appendChild(htmlBtn);
-    bar.appendChild(jsonBtn);
-    h.appendChild(bar);
-
-    htmlBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const j = window.lastJson || null;
-      if (!j) return;
-      const title = 'Summary: ' + (j.rfp_no || 'RFP');
-      const html = '<!doctype html><meta charset="utf-8"><title>'+title+
-        '</title><body>' + (j.summary_html || '<p>(no HTML)</p>') + '</body>';
-      doDownload(new Blob([html], {type:'text/html'}), (j.rfp_no || 'RFP') + '-summary.html');
-    });
-
-    jsonBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const j = window.lastJson || null;
-      if (!j) return;
-      doDownload(new Blob([JSON.stringify(j, null, 2)], {type:'application/json'}),
-                 (j.rfp_no || 'RFP') + '.json');
-    });
-  }
-
-  function refresh(){
-    ensureButtons();
-    const j = window.lastJson || null;
-    const hb = document.getElementById('dlHtmlBtn');
-    const jb = document.getElementById('dlJsonBtn');
-    const has = !!j;
-    if (jb) jb.disabled = !has;
-    if (hb) hb.disabled = !has || !j.summary_html;
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    ensureButtons(); refresh();
-    clearInterval(window.__dlTimer);
-    window.__dlTimer = setInterval(refresh, 750); // polls for lastJson becoming available
-  });
-})();
-
+  <script src="script.js"></script>
+</body>
+</html>
+HTML
