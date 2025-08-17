@@ -89,7 +89,56 @@
     } catch(e){ alert('Download failed: ' + e); }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  
+// ---- Download buttons (HTML & JSON)
+function ensureDownloadButtons() {
+  // try to attach near the top controls; fall back to <form> or <body>
+  const host = document.querySelector('.controls') || document.querySelector('form') || document.body;
+  if (!document.getElementById('dlHtmlBtn')) {
+    const bar = document.createElement('div');
+    bar.className = 'downloads';
+    bar.style.marginTop = '8px';
+
+    const htmlBtn = document.createElement('button');
+    htmlBtn.id = 'dlHtmlBtn';
+    htmlBtn.className = 'btn';
+    htmlBtn.textContent = 'Download Summary (HTML)';
+    htmlBtn.disabled = true;
+    bar.appendChild(htmlBtn);
+
+    const jsonBtn = document.createElement('button');
+    jsonBtn.id = 'dlJsonBtn';
+    jsonBtn.className = 'btn';
+    jsonBtn.style.marginLeft = '8px';
+    jsonBtn.textContent = 'Download Raw JSON';
+    jsonBtn.disabled = true;
+    bar.appendChild(jsonBtn);
+
+    host.appendChild(bar);
+
+    htmlBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!lastJson) return;
+      const title = `Summary: ${lastJson.rfp_no || 'RFP'}`;
+      const html = '<!doctype html><meta charset="utf-8"><title>'+title+'</title><body>'+(lastJson.summary_html || '<p>(no HTML)</p>')+'</body>';
+      triggerDownload(new Blob([html], { type: 'text/html' }), (lastJson.rfp_no || 'RFP') + '-summary.html');
+    });
+
+    jsonBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!lastJson) return;
+      triggerDownload(new Blob([JSON.stringify(lastJson, null, 2)], { type: 'application/json' }), (lastJson.rfp_no || 'RFP') + '.json');
+    });
+  }
+  // enable/disable state
+  const hb = document.getElementById('dlHtmlBtn'), jb = document.getElementById('dlJsonBtn');
+  const has = !!lastJson;
+  if (jb) jb.disabled = !has;
+  if (hb) hb.disabled = !has || !lastJson?.summary_html;
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelector('.tabs');
     if(!tabs) return;
 
@@ -142,7 +191,56 @@
     try{ await navigator.clipboard.writeText(text); }
     catch(e){ alert('Copy failed: '+e); }
   }
-  document.addEventListener('DOMContentLoaded',()=>{
+  
+// ---- Download buttons (HTML & JSON)
+function ensureDownloadButtons() {
+  // try to attach near the top controls; fall back to <form> or <body>
+  const host = document.querySelector('.controls') || document.querySelector('form') || document.body;
+  if (!document.getElementById('dlHtmlBtn')) {
+    const bar = document.createElement('div');
+    bar.className = 'downloads';
+    bar.style.marginTop = '8px';
+
+    const htmlBtn = document.createElement('button');
+    htmlBtn.id = 'dlHtmlBtn';
+    htmlBtn.className = 'btn';
+    htmlBtn.textContent = 'Download Summary (HTML)';
+    htmlBtn.disabled = true;
+    bar.appendChild(htmlBtn);
+
+    const jsonBtn = document.createElement('button');
+    jsonBtn.id = 'dlJsonBtn';
+    jsonBtn.className = 'btn';
+    jsonBtn.style.marginLeft = '8px';
+    jsonBtn.textContent = 'Download Raw JSON';
+    jsonBtn.disabled = true;
+    bar.appendChild(jsonBtn);
+
+    host.appendChild(bar);
+
+    htmlBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!lastJson) return;
+      const title = `Summary: ${lastJson.rfp_no || 'RFP'}`;
+      const html = '<!doctype html><meta charset="utf-8"><title>'+title+'</title><body>'+(lastJson.summary_html || '<p>(no HTML)</p>')+'</body>';
+      triggerDownload(new Blob([html], { type: 'text/html' }), (lastJson.rfp_no || 'RFP') + '-summary.html');
+    });
+
+    jsonBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!lastJson) return;
+      triggerDownload(new Blob([JSON.stringify(lastJson, null, 2)], { type: 'application/json' }), (lastJson.rfp_no || 'RFP') + '.json');
+    });
+  }
+  // enable/disable state
+  const hb = document.getElementById('dlHtmlBtn'), jb = document.getElementById('dlJsonBtn');
+  const has = !!lastJson;
+  if (jb) jb.disabled = !has;
+  if (hb) hb.disabled = !has || !lastJson?.summary_html;
+}
+
+
+document.addEventListener('DOMContentLoaded',()=>{
     const tabs=document.querySelector('.tabs'); if(!tabs) return;
 
     const makeBtn=(id,label,handler)=>{
@@ -202,3 +300,81 @@ document.getElementById('dlHtmlBtn')?.addEventListener('click', ()=>{
   const html='<!doctype html><html><meta charset="utf-8"><title>'+title+'</title><body>'+lastJson.summary_html+'</body></html>';
   triggerDownload(new Blob([html],{type:'text/html'}),(lastJson.rfp_no||'rfp')+'-summary.html');
 });
+
+
+// ===== Download buttons (HTML + JSON) – safe, idempotent =====
+(() => {
+  if (window.__dlPatched) return; window.__dlPatched = true;
+
+  function fallbackDownload(blob, filename){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+  const doDownload = (window.triggerDownload || fallbackDownload);
+
+  function host(){
+    return document.querySelector('.controls') || document.querySelector('form') || document.body;
+  }
+
+  function ensureButtons(){
+    if (document.getElementById('dlHtmlBtn')) return;
+    const h = host();
+    const bar = document.createElement('div');
+    bar.className = 'downloads';
+    bar.style.marginTop = '8px';
+
+    const htmlBtn = document.createElement('button');
+    htmlBtn.id = 'dlHtmlBtn';
+    htmlBtn.className = 'btn';
+    htmlBtn.textContent = 'Download Summary (HTML)';
+    htmlBtn.disabled = true;
+
+    const jsonBtn = document.createElement('button');
+    jsonBtn.id = 'dlJsonBtn';
+    jsonBtn.className = 'btn';
+    jsonBtn.style.marginLeft = '8px';
+    jsonBtn.textContent = 'Download Raw JSON';
+    jsonBtn.disabled = true;
+
+    bar.appendChild(htmlBtn);
+    bar.appendChild(jsonBtn);
+    h.appendChild(bar);
+
+    htmlBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const j = window.lastJson || null;
+      if (!j) return;
+      const title = 'Summary: ' + (j.rfp_no || 'RFP');
+      const html = '<!doctype html><meta charset="utf-8"><title>'+title+
+        '</title><body>' + (j.summary_html || '<p>(no HTML)</p>') + '</body>';
+      doDownload(new Blob([html], {type:'text/html'}), (j.rfp_no || 'RFP') + '-summary.html');
+    });
+
+    jsonBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const j = window.lastJson || null;
+      if (!j) return;
+      doDownload(new Blob([JSON.stringify(j, null, 2)], {type:'application/json'}),
+                 (j.rfp_no || 'RFP') + '.json');
+    });
+  }
+
+  function refresh(){
+    ensureButtons();
+    const j = window.lastJson || null;
+    const hb = document.getElementById('dlHtmlBtn');
+    const jb = document.getElementById('dlJsonBtn');
+    const has = !!j;
+    if (jb) jb.disabled = !has;
+    if (hb) hb.disabled = !has || !j.summary_html;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ensureButtons(); refresh();
+    clearInterval(window.__dlTimer);
+    window.__dlTimer = setInterval(refresh, 750); // polls for lastJson becoming available
+  });
+})();
+
