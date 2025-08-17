@@ -73,3 +73,55 @@
     });
   });
 })();
+
+
+// ---- export helpers (appended) ----
+(function(){
+  function downloadText(filename, mime, text) {
+    try {
+      const blob = new Blob([text], {type: mime});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    } catch(e){ alert('Download failed: ' + e); }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelector('.tabs');
+    if(!tabs) return;
+
+    if(!document.getElementById('btnDownloadJson')){
+      const btnJson = document.createElement('button');
+      btnJson.id = 'btnDownloadJson';
+      btnJson.type = 'button';
+      btnJson.className = 'tab';
+      btnJson.textContent = 'Download JSON';
+      btnJson.addEventListener('click', () => {
+        if (!window.lastJson) { alert('Run a summary first.'); return; }
+        const pretty = JSON.stringify(window.lastJson, null, 2);
+        downloadText('rfp-summary.json', 'application/json', pretty);
+      });
+      tabs.appendChild(btnJson);
+    }
+
+    if(!document.getElementById('btnDownloadHtml')){
+      const btnHtml = document.createElement('button');
+      btnHtml.id = 'btnDownloadHtml';
+      btnHtml.type = 'button';
+      btnHtml.className = 'tab';
+      btnHtml.textContent = 'Download HTML';
+      btnHtml.addEventListener('click', () => {
+        if (!window.lastJson || !(window.lastJson.summary_html || window.lastJson.page_html)) {
+          alert('No HTML available yet. Run a summary first.'); return;
+        }
+        const body = (window.lastJson.summary_html || window.lastJson.page_html || '');
+        const doc = `<!doctype html><html><head><meta charset="utf-8"><title>RFP Summary</title></head><body>${body}</body></html>`;
+        downloadText('rfp-summary.html', 'text/html', doc);
+      });
+      tabs.appendChild(btnHtml);
+    }
+  });
+})();
