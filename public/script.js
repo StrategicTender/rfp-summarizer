@@ -125,3 +125,52 @@
     }
   });
 })();
+
+
+/* UTIL_EXPORTS */
+(function(){
+  function downloadText(filename, mime, text){
+    try{
+      const blob=new Blob([text],{type:mime});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0);
+    }catch(e){ alert('Download failed: '+e); }
+  }
+  async function copyText(text){
+    try{ await navigator.clipboard.writeText(text); }
+    catch(e){ alert('Copy failed: '+e); }
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    const tabs=document.querySelector('.tabs'); if(!tabs) return;
+
+    const makeBtn=(id,label,handler)=>{
+      if(document.getElementById(id)) return;
+      const b=document.createElement('button');
+      b.id=id; b.type='button'; b.className='tab'; b.textContent=label;
+      b.addEventListener('click',handler); tabs.appendChild(b);
+    };
+
+    makeBtn('btnCopyJson','Copy JSON',()=> {
+      if(!window.lastJson) return alert('Run a summary first.');
+      copyText(JSON.stringify(window.lastJson,null,2));
+    });
+    makeBtn('btnDownloadJson','Download JSON',()=> {
+      if(!window.lastJson) return alert('Run a summary first.');
+      downloadText('rfp-summary.json','application/json',
+                   JSON.stringify(window.lastJson,null,2));
+    });
+    makeBtn('btnCopyHtml','Copy HTML',()=> {
+      const html=(window.lastJson&& (lastJson.summary_html||lastJson.page_html))||'';
+      if(!html) return alert('No HTML yet. Run a summary first.');
+      copyText(html);
+    });
+    makeBtn('btnDownloadHtml','Download HTML',()=> {
+      const html=(window.lastJson&& (lastJson.summary_html||lastJson.page_html))||'';
+      if(!html) return alert('No HTML yet. Run a summary first.');
+      const doc='<!doctype html><html><head><meta charset="utf-8"><title>RFP Summary</title></head><body>'+html+'</body></html>';
+      downloadText('rfp-summary.html','text/html',doc);
+    });
+  });
+})();
