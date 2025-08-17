@@ -1,64 +1,141 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>RFP Summarizer</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="icon" href="data:," />
-  <style>
-    :root { --bg:#f7f8fc; --card:#fff; --text:#14213d; --muted:#6b7280; --brand:#2563eb; --brand-2:#1d4ed8; --ring:#bfdbfe; }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;}
-    .wrap{max-width:960px;margin:56px auto;padding:0 20px;}
-    h1{font-size:40px;margin:8px 0 24px 0;text-align:center;}
-    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:22px;margin:0 auto 20px;}
-    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
-    input[type=file]{padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;min-width:320px}
-    .btn{border:0;border-radius:10px;padding:10px 16px;background:#e5e7eb;color:#111;cursor:pointer;font-weight:600}
-    .btn[disabled]{opacity:.5;cursor:not-allowed}
-    .btn.primary{background:var(--brand);color:#fff}
-    .btn.primary:hover{background:var(--brand-2)}
-    .tabs{display:flex;gap:10px;margin-top:14px;justify-content:center}
-    .pill{border:1px solid #e5e7eb;border-radius:999px;padding:8px 14px;background:#fff;cursor:pointer}
-    .pill.active{background:var(--brand);border-color:var(--brand);color:#fff}
-    .muted{color:var(--muted)}
-    #downloadBar{margin-top:12px;display:flex;gap:8px;justify-content:center}
-    #out{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:18px;min-height:120px}
-    pre{background:#0b1020;color:#dbeafe;border-radius:12px;padding:14px;overflow:auto}
-    .hidden{display:none}
-    .center{display:flex;justify-content:center;align-items:center}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>RFP Summarizer</h1>
+// public/script.js
 
-    <div class="card">
-      <div class="row">
-        <input id="file" type="file" accept=".pdf,.PDF" />
-        <button id="btn" class="btn primary">Summarize RFP</button>
-      </div>
+// --- Config ---
+// In production we call our Netlify function proxy, which forwards to Cloud Run.
+const BACKEND = '/.netlify/functions/summarizer-proxy';
 
-      <div class="tabs">
-        <button id="tabSummary" class="pill active">Summary</button>
-        <button id="tabJson" class="pill">Raw JSON</button>
-      </div>
+// --- State ---
+let lastJson = null;
 
-      <div id="downloadBar">
-        <button id="dlHtmlBtn" class="btn" disabled>Download Summary (HTML)</button>
-        <button id="dlJsonBtn" class="btn" disabled>Download Raw JSON</button>
-      </div>
-    </div>
+// --- DOM ---
+const $ = (id) => document.getElementById(id);
+const fileInput   = $('file');
+const goBtn       = $('btn');
+const outEl       = $('out');
+const jsonEl      = $('json');
+const tabSummary  = $('tabSummary');
+const tabJson     = $('tabJson');
+const panelSummary= $('panelSummary');
+const panelJson   = $('panelJson');
+const dlHtmlBtn   = $('dlHtmlBtn');
+const dlJsonBtn   = $('dlJsonBtn');
 
-    <div id="panelSummary">
-      <div id="out"><p class="muted center">Upload a PDF and click <strong>Summarize RFP</strong>.</p></div>
-    </div>
+// --- Helpers ---
+function setBusy(busy) {
+  goBtn.disabled = busy;
+  fileInput.disabled = busy;
+  goBtn.textContent = busy ? 'Working…' : 'Summarize RFP';
+}
 
-    <div id="panelJson" class="hidden">
-      <pre id="json">{}</pre>
-    </div>
-  </div>
+function showError(err) {
+  const msg = (err && (err.message || err.toString())) || 'Unknown error';
+  outEl.innerHTML = `<pre style="white-space:pre-wrap;color:#b91c1c;background:#fef2f2;border-radius:12px;padding:12px">
+Error: ${msg}
+</pre>`;
+}
 
-  <script src="script.js"></script>
-</body>
-</html>
-HTML
+function showTab(which) {
+  const summary = which === 'summary';
+  tabSummary.classList.toggle('active', summary);
+  tabJson.classList.toggle('active', !summary);
+  panelSummary.classList.toggle('hidden', !summary);
+  panelJson.classList.toggle('hidden', summary);
+}
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); }
+  catch { return String(obj); }
+}
+
+function triggerDownload(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function enableDownloads() {
+  const ok = !!lastJson;
+  dlHtmlBtn.disabled = !ok;
+  dlJsonBtn.disabled = !ok;
+}
+
+function renderSummary(data) {
+  // Prefer server-produced HTML if available, else fallback to super-basic.
+  const html = (data && data.summary_html)
+    ? String(data.summary_html)
+    : `<h2>Summary</h2><p>No formatted summary returned.</p>`;
+  outEl.innerHTML = html;
+}
+
+function renderJson(data) {
+  jsonEl.textContent = pretty(data || {});
+}
+
+async function run() {
+  try {
+    if (!fileInput.files || !fileInput.files[0]) {
+      alert('Choose a PDF first.'); return;
+    }
+    setBusy(true);
+
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+
+    const res = await fetch(BACKEND, { method: 'POST', body: fd });
+    const text = await res.text();
+
+    let data;
+    try { data = JSON.parse(text); }
+    catch {
+      // If backend ever returns HTML/plain on error
+      throw new Error(res.ok ? 'Unexpected response' : `HTTP ${res.status}: ${text.slice(0,200)}`);
+    }
+
+    if (!res.ok) {
+      const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    lastJson = data;
+    renderSummary(data);
+    renderJson(data);
+    enableDownloads();
+    showTab('summary');  // default back to Summary after each run
+  } catch (err) {
+    showError(err);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// --- Wire up UI ---
+document.addEventListener('DOMContentLoaded', () => {
+  setBusy(false);
+  enableDownloads();
+  showTab('summary');
+
+  goBtn.addEventListener('click', (e) => { e.preventDefault(); run(); });
+
+  tabSummary.addEventListener('click', () => showTab('summary'));
+  tabJson.addEventListener('click', () => showTab('json'));
+
+  dlJsonBtn.addEventListener('click', () => {
+    if (!lastJson) return;
+    const name = (lastJson.rfp_no || 'rfp') + '.json';
+    triggerDownload(new Blob([pretty(lastJson)], { type: 'application/json' }), name);
+  });
+
+  dlHtmlBtn.addEventListener('click', () => {
+    if (!lastJson) return;
+    const title = lastJson.rfp_no || 'RFP Summary';
+    const htmlDoc = `<!doctype html><meta charset="utf-8">
+<title>${title}</title>
+<body>${lastJson.summary_html || '<h2>Summary</h2><p>No formatted summary returned.</p>'}</body>`;
+    const name = (lastJson.rfp_no || 'rfp') + '-summary.html';
+    triggerDownload(new Blob([htmlDoc], { type: 'text/html' }), name);
+  });
+});

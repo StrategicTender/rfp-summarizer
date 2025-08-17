@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>RFP Summarizer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --bg:#f7f8fc; --card:#fff; --text:#0f172a; --muted:#64748b;
+      --brand:#2563eb; --brand-2:#1d4ed8;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;}
+    .wrap{max-width:960px;margin:56px auto;padding:0 20px}
+    h1{font-size:40px;margin:8px 0 24px;text-align:center}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:22px;margin:0 auto 20px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+    input[type=file]{padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;min-width:320px}
+    .btn{border:0;border-radius:10px;padding:10px 16px;background:#e5e7eb;color:#111;cursor:pointer;font-weight:600}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .btn.primary{background:var(--brand);color:#fff}
+    .btn.primary:hover{background:var(--brand-2)}
+    .tabs{display:flex;gap:10px;margin-top:14px;justify-content:center}
+    .pill{border:1px solid #e5e7eb;border-radius:999px;padding:8px 14px;background:#fff;cursor:pointer}
+    .pill.active{background:var(--brand);border-color:var(--brand);color:#fff}
+    #downloadBar{margin-top:12px;display:flex;gap:8px;justify-content:center}
+    #out{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(16,24,40,.06);padding:18px;min-height:120px}
+    pre{background:#0b1020;color:#dbeafe;border-radius:12px;padding:14px;overflow:auto}
+    .hidden{display:none}
+    .muted{color:var(--muted)}
+    .center{display:flex;justify-content:center;align-items:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>RFP Summarizer</h1>
+
+    <div class="card">
+      <div class="row">
+        <input id="file" type="file" accept=".pdf,.PDF" />
+        <button id="btn" class="btn primary">Summarize RFP</button>
+      </div>
+
+      <div class="tabs">
+        <button id="tabSummary" class="pill active">Summary</button>
+        <button id="tabJson" class="pill">Raw JSON</button>
+      </div>
+
+      <div id="downloadBar">
+        <button id="dlHtmlBtn" class="btn" disabled>Download Summary (HTML)</button>
+        <button id="dlJsonBtn" class="btn" disabled>Download Raw JSON</button>
+      </div>
+    </div>
+
+    <div id="panelSummary">
+      <div id="out"><p class="muted center">Upload a PDF and click <strong>Summarize RFP</strong>.</p></div>
+    </div>
+
+    <div id="panelJson" class="hidden">
+      <pre id="json">{}</pre>
+    </div>
+  </div>
+
+  <!-- JS logic comes from public/script.js (I’ll give you this next) -->
+  <script src="script.js"></script>
+</body>
+</html>
