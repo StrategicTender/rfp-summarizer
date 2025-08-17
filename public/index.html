@@ -20,6 +20,7 @@
     .tab{background:#e5edff;color:#123; border:0;border-radius:999px;padding:8px 14px}
     #spinner{display:none;margin-left:8px}
     #resultOutput{max-width:760px;margin:20px auto;text-align:left}
+    .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
   </style>
 </head>
 <body>
@@ -32,7 +33,7 @@
         <div class="row">
           <input id="pdfInput" type="file" accept="application/pdf" />
           <button id="summarizeBtn" type="button" disabled>Summarize RFP</button>
-          <span id="spinner">⏳ Working…</span>
+          <span id="spinner" aria-live="polite">⏳ Working…</span>
         </div>
         <div class="tabs" aria-hidden="true">
           <button type="button" class="tab">Summary</button>
@@ -42,8 +43,66 @@
     </div>
 
     <div id="resultOutput"></div>
+    <p class="visually-hidden" id="buildTag">build: inline-wire v1</p>
   </div>
 
-  <script src="script.js" defer></script>
+  <!-- Inline wiring so the button always fires in production -->
+  <script>
+  (function(){
+    const API_URL = 'https://summarize-rfp-v2-293196834043.us-central1.run.app/summarize_rfp';
+    const $ = (id) => document.getElementById(id);
+    const out = $('resultOutput');
+    const btn = $('summarizeBtn');
+    const file = $('pdfInput');
+    const spin = $('spinner');
+
+    function setBusy(b){
+      if (spin) spin.style.display = b ? 'inline-block' : 'none';
+      if (btn) { btn.disabled = b; btn.setAttribute('aria-busy', String(b)); }
+    }
+    function b64FromArrayBuffer(buf){
+      let binary=''; const bytes=new Uint8Array(buf);
+      for (let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+    async function run(){
+      try{
+        const f = file && file.files && file.files[0];
+        if(!f){ alert('Choose a PDF first.'); return; }
+        setBusy(true);
+        out.innerHTML = '<p>Uploading & summarizing…</p>';
+        const buf = await f.arrayBuffer();
+        const b64 = b64FromArrayBuffer(buf);
+
+        const res = await fetch(API_URL, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ filename: f.name, content: b64, options:{language:'en'} })
+        });
+        const text = await res.text();
+        let json; try { json = JSON.parse(text); } catch(e){ throw new Error(`Non-JSON (${res.status}) ${text.slice(0,200)}…`); }
+        if(!res.ok) throw new Error(json && json.error ? json.error : `HTTP ${res.status}`);
+        const missing = Array.isArray(json.missing) ? json.missing : [];
+        const html = json.summary_html || json.page_html || '';
+        const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
+        out.innerHTML = (notice ? notice : '') + '<h2>Summary</h2>' + (html || '<p>(no html)</p>');
+      } catch(err){
+        console.error(err);
+        out.innerHTML = `<pre style="white-space:pre-wrap">Error: ${String(err.message || err)}</pre>`;
+        alert(`Error: ${String(err.message || err)}`);
+      } finally { setBusy(false); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      setBusy(false);
+      if (file && btn){
+        btn.addEventListener('click', function(ev){ ev.preventDefault(); run(); });
+        file.addEventListener('change', function(){ btn.disabled = !(file.files && file.files.length > 0); });
+        // Enable immediately if browser restored prior selection
+        btn.disabled = !(file.files && file.files.length > 0) ? true : false;
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
