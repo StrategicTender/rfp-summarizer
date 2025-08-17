@@ -3,92 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RFP Summarizer — Strategic Tender</title>
+  <title>RFP Summarizer • Strategic Tender</title>
+  <link rel="icon" href="logo.png">
   <style>
-    :root { --bg:#f7f7fb; --card:#ffffff; --text:#111; --muted:#666; --accent:#3466ff; --border:#e5e7eb; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, "Helvetica Neue", sans-serif; background:var(--bg); color:var(--text); }
-    .wrap { max-width: 860px; margin: 48px auto; padding: 0 16px; }
-    header { text-align:center; margin-bottom: 24px; }
-    header img { width: 88px; height: 88px; object-fit: contain; display:block; margin: 0 auto 12px; }
-    h1 { margin: 0 0 8px; font-size: 32px; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    label.button { display:inline-block; padding:10px 14px; border:1px solid var(--border); border-radius:10px; background:#fafafa; cursor:pointer; }
-    input[type="file"] { display:none; }
-    button { padding:10px 16px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.45; cursor:not-allowed; }
-    .status { color:var(--muted); margin:10px 0 14px; }
-    .label { font-size:13px; color:#444; margin:0 0 6px; }
-    .tabs { display:flex; gap:8px; margin:8px 0 6px; }
-    .tabs button { background:#eef2ff; color:#111; }
-    .tabs button.active { background:#3466ff; color:#fff; }
-    .nice { border:1px solid var(--border); border-radius:12px; padding:14px; background:#fcfcff; line-height:1.35; }
-    .nice h2 { margin:10px 0 6px; font-size:18px; }
-    .nice p { margin:8px 0; }
-    .nice ul { margin:6px 0 6px 20px; }
-    textarea { width:100%; min-height:260px; padding:12px; border:1px solid var(--border); border-radius:12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; background:#fcfcff; }
+    :root { --bg:#f7f8fb; --card:#ffffff; --text:#111827; --muted:#6b7280; --brand:#2563eb; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .wrap{max-width:960px;margin:48px auto;padding:0 16px;text-align:center}
+    .logo{width:84px;height:auto;margin:0 auto 16px}
+    h1{font-size:40px;margin:8px 0 24px}
+    .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:24px;margin:0 auto;max-width:760px}
+    .row{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap}
+    input[type="file"]{padding:10px;border:1px dashed #d1d5db;border-radius:12px;background:#fff}
+    button{background:var(--brand);color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:600;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .tabs{margin-top:14px;display:flex;gap:10px;justify-content:center}
+    .tab{background:#e5edff;color:#123; border:0;border-radius:999px;padding:8px 14px}
+    #spinner{display:none;margin-left:8px}
+    #resultOutput{max-width:760px;margin:20px auto;text-align:left}
   </style>
-  <meta name="backend-url" content="https://summarize-rfp-v2-293196834043.us-central1.run.app">
-  <link rel="stylesheet" href="pro.css?v=1755303310">
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <img src="./logo.png" alt="Strategic Tender logo" />
-      <h1>RFP Summarizer</h1>
-    </header>
+    <img class="logo" src="logo.png" alt="Strategic Tender logo">
+    <h1>RFP Summarizer</h1>
 
     <div class="card">
-      <div class="row">
-        <label class="button" for="file">Choose File</label>
-        <input id="file" type="file" accept="application/pdf" />
-        <div id="filename" class="label"></div>
-        <button id="go" disabled>Summarize RFP</button>
-      </div>
-
-      <div id="status" class="status">Choose a PDF to begin.</div>
-
-      <div class="label">Result</div>
-      <div class="controls small" style="margin:6px 0 4px 0;"><label></label></div>
-<div class="controls small" style="margin:6px 0 4px 0;"><div class="seg" id="langToggle" role="tablist" aria-label="Language"><button type="button" id="lang-en" class="active">English</button><button type="button" id="lang-fr">Français</button></div></div>
-<div class="tabs">
-        <button id="tab-summary" class="active" type="button">Summary</button>
-        <button id="tab-raw" type="button">Raw JSON</button>
-      </div>
-      <div id="nice" class="nice"></div>
-      <textarea id="out" style="display:none" readonly></textarea>
+      <form id="summarizeForm" action="#" onsubmit="return false;">
+        <div class="row">
+          <input id="pdfInput" type="file" accept="application/pdf" />
+          <button id="summarizeBtn" type="button" disabled>Summarize RFP</button>
+          <span id="spinner">⏳ Working…</span>
+        </div>
+        <div class="tabs" aria-hidden="true">
+          <button type="button" class="tab">Summary</button>
+          <button type="button" class="tab">Raw JSON</button>
+        </div>
+      </form>
     </div>
+
+    <div id="resultOutput"></div>
   </div>
 
-  <script>
-    // Show chosen filename beside the button for clarity
-    document.addEventListener('DOMContentLoaded', () => {
-      const f = document.getElementById('file');
-      const nameEl = document.getElementById('filename');
-      f?.addEventListener('change', () => {
-        nameEl.textContent = f.files && f.files[0] ? f.files[0].name : '';
-      });
-
-      // Tab toggle logic
-      const tabSummary = document.getElementById('tab-summary');
-      const tabRaw = document.getElementById('tab-raw');
-      const nice = document.getElementById('nice');
-      const out = document.getElementById('out');
-
-      function showSummary() {
-        tabSummary.classList.add('active'); tabRaw.classList.remove('active');
-        nice.style.display = ''; out.style.display = 'none';
-      }
-      function showRaw() {
-        tabRaw.classList.add('active'); tabSummary.classList.remove('active');
-        nice.style.display = 'none'; out.style.display = '';
-      }
-      tabSummary.addEventListener('click', showSummary);
-      tabRaw.addEventListener('click', showRaw);
-      showSummary();
-    });
-  </script>
-  <script src="./script.js" defer></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
