@@ -174,3 +174,31 @@
     });
   });
 })();
+
+function triggerDownload(blob, filename){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(a.href);
+  a.remove();
+}
+function enableDownloads(){
+  const has = typeof lastJson!=='undefined' && lastJson;
+  const jb=document.getElementById('dlJsonBtn');
+  const hb=document.getElementById('dlHtmlBtn');
+  if(jb) jb.disabled=!has;
+  if(hb) hb.disabled=!(has && lastJson.summary_html);
+}
+document.getElementById('dlJsonBtn')?.addEventListener('click', ()=>{
+  if(!lastJson) return;
+  const pretty=JSON.stringify(lastJson,null,2);
+  triggerDownload(new Blob([pretty],{type:'application/json'}),(lastJson.rfp_no||'rfp')+'.json');
+});
+document.getElementById('dlHtmlBtn')?.addEventListener('click', ()=>{
+  if(!lastJson || !lastJson.summary_html) return;
+  const title='Summary: '+(lastJson.rfp_no||'RFP');
+  const html='<!doctype html><html><meta charset="utf-8"><title>'+title+'</title><body>'+lastJson.summary_html+'</body></html>';
+  triggerDownload(new Blob([html],{type:'text/html'}),(lastJson.rfp_no||'rfp')+'-summary.html');
+});
