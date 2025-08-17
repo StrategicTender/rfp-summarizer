@@ -1,161 +1,75 @@
-/**
- * Strategic Tender — RFP Summarizer UI script
- * - Sends JSON { file_content, filename } to the Netlify proxy
- * - Renders a clean, readable summary (basic markdown → HTML)
- */
+/* Strategic Tender — RFP Summarizer UI glue (form-safe)
+   Prevents default form submit so the chosen file stays selected. */
 
 (() => {
+  const API_BASE = 'https://summarize-rfp-v2-293196834043.us-central1.run.app';
+  const API_URL  = API_BASE + '/summarize_rfp';
+
   const $ = (id) => document.getElementById(id);
+  const out = $('resultOutput') || $('out');
+  const btn = $('summarizeBtn') || $('btn');
+  const fileInput = $('pdfInput') || $('file');
+  const spinner = $('spinner') || $('loading');
+  const form = $('summarizeForm') || document.querySelector('form');
 
-  const fileInput = $('file');
-  const goBtn = $('go');
-  const statusEl = $('status');
-  const outEl = $('out');
-  const niceEl = $('nice');
+  if (form) form.addEventListener('submit', (e) => e.preventDefault());
+  if (btn && btn.getAttribute('type') !== 'button') btn.setAttribute('type', 'button');
 
-  const setStatus = (msg) => { statusEl.textContent = msg; };
-
-  // Only toggle the GO button. Never disable the file input.
-  const setBusy = (busy) => {
-    const hasFile = !!(fileInput.files && fileInput.files.length);
-    goBtn.disabled = busy || !hasFile;
-  };
-
-  // Enable button when a file is chosen
-  fileInput.addEventListener('change', () => {
-    setStatus(fileInput.files?.length ? 'Ready to upload.' : 'Choose a PDF to begin.');
-    setBusy(false);
-  });
-
-  // Read a File as base64 (no prefix)
-  function readAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onerror = () => reject(new Error('Failed to read file.'));
-      fr.onload = () => {
-        try {
-          const s = String(fr.result || '');
-          const comma = s.indexOf(',');
-          if (comma === -1) return reject(new Error('Unexpected data URL format.'));
-          resolve(s.slice(comma + 1)); // strip "data:...;base64,"
-        } catch (e) { reject(e); }
-      };
-      fr.readAsDataURL(file);
-    });
+  function setBusy(b) {
+    if (spinner) spinner.style.display = b ? 'inline-block' : 'none';
+    if (btn) { btn.disabled = b; btn.ariaBusy = String(b); }
   }
 
-  // Escape HTML
-  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-
-  // Very small markdown-ish renderer for **bold**, headings, bullets, newlines
-  function mdish(s) {
-    let t = String(s);
-
-    // Convert Windows newlines
-    t = t.replace(/\r\n/g, '\n');
-
-    // Split into paragraphs by blank line
-    const blocks = t.split(/\n{2,}/);
-
-    const html = blocks.map(block => {
-      // Bulleted list (lines starting with - or •)
-      if (/^(\s*[-•]\s+)/m.test(block)) {
-        const items = block.split('\n').filter(Boolean).map(line =>
-          line.replace(/^\s*[-•]\s*/, '').trim()
-        ).map(li => `<li>${inline(li)}</li>`).join('');
-        return `<ul>${items}</ul>`;
-      }
-      // Heading patterns like "**Title:**", or leading **
-      if (/^\*\*.+\*\*/.test(block) && !block.includes(':')) {
-        return `<h2>${inline(block.replace(/^\*\*|\*\*$/g, ''))}</h2>`;
-      }
-      // Paragraph
-      const lines = block.split('\n').map(inline);
-      return `<p>${lines.join('<br>')}</p>`;
-    }).join('\n');
-
-    return html;
+  function b64FromArrayBuffer(buf) {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
   }
 
-  // Inline formatting: **bold**
-  function inline(s) {
-    return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  }
-
-  // Render server response into the pretty panel + raw textarea
-  function present(body) {
+  async function run() {
     try {
-      outEl.value = JSON.stringify(body, null, 2);
-    } catch {
-      outEl.value = String(body);
-    }
+      const f = fileInput?.files?.[0];
+      if (!f) { alert('Choose a PDF first.'); return; }
+      setBusy(true);
+      out && (out.innerHTML = '<p>Uploading & summarizing…</p>');
 
-    // Prefer a 'summary' field when present
-    if (body && typeof body === 'object' && typeof body.summary === 'string') {
-      niceEl.innerHTML = mdish(body.summary);
-      return;
-    }
-    // If it's a string, render it
-    if (typeof body === 'string') {
-      niceEl.innerHTML = mdish(body);
-      return;
-    }
-    // Otherwise show the object keys in a simple list
-    try {
-      const keys = Object.keys(body || {});
-      niceEl.innerHTML = `<p><strong>Response Keys:</strong> ${keys.map(esc).join(', ') || '—'}</p>`;
-    } catch {
-      niceEl.innerHTML = `<p>${esc(String(body))}</p>`;
-    }
-  }
+      const buf = await f.arrayBuffer();
+      const b64 = b64FromArrayBuffer(buf);
 
-  async function summarize() {
-    const f = fileInput.files?.[0];
-    if (!f) { setStatus('No file selected.'); return; }
-    if (!/\.pdf$/i.test(f.name)) {
-      setStatus('Please select a PDF file.'); return;
-    }
-
-    setBusy(true);
-    outEl.value = '';
-    niceEl.innerHTML = '';
-    setStatus('Reading file…');
-
-    try {
-      const b64 = await readAsBase64(f);
-      setStatus('Uploading to backend…');
-
-      const res = await fetch('/.netlify/functions/summarizer-proxy', {
+      const res = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ file_content: b64, filename: f.name }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: f.name,
+          content: b64,
+          options: { language: 'en' }
+        }),
       });
 
-      const ct = res.headers.get('content-type') || '';
-      const body = ct.includes('application/json') ? await res.json() : await res.text();
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); }
+      catch { throw new Error(`Non-JSON response (${res.status}). Body: ${text.slice(0,300)}…`); }
+      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
 
-      if (!res.ok) {
-        present({ http_status: res.status, error: body });
-        setStatus(`Error ${res.status}. See details below.`);
-        return;
-      }
+      const missing = Array.isArray(json?.missing) ? json.missing : [];
+      const html = json?.summary_html || json?.page_html || '';
+      const notice = missing.length ? `<h2>Missing</h2><p>${missing.join(', ') || 'none'}</p>` : '';
 
-      present(body);
-      setStatus('Done.');
+      if (out) out.innerHTML = (notice ? notice : '') + `<h2>Summary</h2>` + (html || '<p>(no html)</p>');
     } catch (err) {
-      present({ error: String((err && err.message) || err) });
-      setStatus('Failed. See details below.');
-    } finally {
-      setBusy(false);
-    }
+      console.error(err);
+      out && (out.innerHTML = `<pre style="white-space:pre-wrap">Error: ${String(err.message || err)}</pre>`);
+      alert(`Error: ${String(err.message || err)}`);
+    } finally { setBusy(false); }
   }
 
-  goBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    summarize();
+  window.addEventListener('DOMContentLoaded', () => {
+    setBusy(false);
+    if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); run(); });
+    if (fileInput && btn) btn.addEventListener('change', () => {
+      btn.disabled = !(fileInput.files && fileInput.files.length > 0);
+    });
   });
-
-  // Initial state
-  setBusy(false);
-  setStatus('Choose a PDF to begin.');
 })();

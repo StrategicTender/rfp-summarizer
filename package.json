@@ -19,7 +19,7 @@
   "homepage": "https://github.com/StrategicTender/rfp-summarizer#readme",
   "dependencies": {
     "busboy": "^1.6.0",
-    "google-auth-library": "^9.15.1"
+    "google-auth-library": "^9.14.1"
   },
   "description": ""
 }

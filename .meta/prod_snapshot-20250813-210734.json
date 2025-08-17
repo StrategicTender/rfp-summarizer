@@ -1,0 +1,11 @@
+{
+  "site_slug": "rfp-summarizer-final",
+  "prod_url": "https://rfp-summarizer-final.netlify.app",
+  "unique_deploy_url": "https://689d451fed590d756a6a6573--rfp-summarizer-final.netlify.appSNAP=$(ls -t .meta/prod_snapshot-*.json | head -1); echo "Latest snapshot: $SNAP"; cat "$SNAP"",
+  "deploy_id": "689d451fed590d756a6a6573",
+  "netlify_timestamp": "git add "$SNAP" && git commit -m "chore: record prod deploy snapshot"",
+  "app_permalink": "https://app.netlify.com/sites/rfp-summarizer-final/deploys/689d451fed590d756a6a6573",
+  "saved_at_local": "2025-08-13 21:07:34 MDT",
+  "git_tag": "stable-ui-2025-08-13",
+  "git_commit": "e2c445a"
+}

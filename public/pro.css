@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --text:#0f172a; --muted:#64748b;
+  --brand:#3b82f6; --brand-hover:#2563eb; --border:#e5e7eb;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif; line-height:1.55}
+h1{font-weight:700;letter-spacing:.2px;text-align:center;margin:18px 0 24px}
+.logo{display:block;margin:0 auto 8px;height:84px;width:auto;filter:drop-shadow(0 6px 14px rgba(2,6,23,.10))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  box-shadow:0 10px 20px rgba(2,6,23,.08);padding:24px}
+.form-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.form-row .spacer{flex:1}
+input[type=file]{border:1px dashed var(--border);padding:10px 12px;border-radius:12px;background:#fff}
+button{appearance:none;border:0;background:var(--brand);color:#fff;
+  padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 10px rgba(59,130,246,.25);transition:all .15s}
+button:hover{background:var(--brand-hover);transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+#status,#statusLine{color:var(--muted);font-size:.95rem;margin-top:8px}
+#resultOutput,#result,#out{width:100%;min-height:420px;border:1px solid var(--border);
+  border-radius:12px;padding:14px;background:#fff;box-shadow:inset 0 1px 2px rgba(2,6,23,.03);
+  resize:vertical;white-space:pre-wrap}
+.tabs{display:flex;gap:8px;margin:12px 0}
+button[id^="tab-"]{background:#f1f5f9;color:#0f172a}
+button[id^="tab-"].active{background:var(--brand);color:#fff}
+.small{font-size:.9rem;color:var(--muted)}
+.container{max-width:960px;margin:48px auto;padding:0 20px}
+/* Language segmented control */
+.seg{display:inline-flex;border:1px solid var(--border);background:#fff;border-radius:10px;padding:2px;gap:2px}
+.seg button{background:transparent;border:0;padding:6px 10px;border-radius:8px;font-weight:600;cursor:pointer}
+.seg button.active{background:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(59,130,246,.25)}
